@@ -32,50 +32,63 @@ def search_cik(ticker):
     return cik
 
 
+
+def date_validation(date):
+
+    date_l = date.split('-')
+    dict_months = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'} 
+    date_valid = dict_months[int(date_l[1])]+f'.*{date_l[2]}.*{date_l[0]}'
+    return date_valid
+
+
 def get_10_k_links(ticker):
 
     cik = search_cik(ticker)
 
-    payload = json.dumps({"entityName":cik,"filter_forms":"10-K","startdt":"2017-12-02","enddt":"2022-12-02"})
+    payload = json.dumps({"entityName":cik,"filter_forms":"10-K","startdt":"2016-12-02","enddt":"2022-12-02"})
 
     req = requests.post(sec_search_endpoint,headers=header_req,data=payload)
 
     list_fillings = req.json()['hits']['hits']
 
-    list_adsh = [f'https://www.sec.gov/Archives/edgar/data/{cik}/'+filling['_source']['adsh'].replace('-','') for filling in list_fillings if filling['_source']['file_type'] == '10-K' ]
+    list_adsh = [{'date':date_validation(filling['_source']['period_ending']),'url':f'https://www.sec.gov/Archives/edgar/data/{cik}/'+filling['_source']['adsh'].replace('-','')} for filling in list_fillings if filling['_source']['file_type'] == '10-K' ]
 
     return list_adsh
 
 
 
-
-
-def parse_statement(non_balance,file_url):
+def parse_statement(non_balance,file_url,date):
 
     req = requests.get(file_url,headers=header_req).text
 
     rows_list = BeautifulSoup(req,features="html.parser").find('table',{"class": "report"}).find_all('tr')
 
-    title = rows_list[0].find('th').getText().upper()
 
     if non_balance:
-        times_segments = rows_list[0].find_all('th',attrs={'class':'th'})
 
-        ended_12_months = rows_list[0].find('th',text=(re.compile("12 months ended", re.I)))
+        years = (rows_list[1].find_all('th',attrs={'class':'th'}))
+        years.reverse()
 
-        index = times_segments.index(ended_12_months)
-        columns = ended_12_months['colspan']   
+        #year_filling = rows_list[1].find('th',attrs={'class':'th'},text=re.compile(f'{date}',re.I)).getText()
 
-        years = rows_list[1].find_all('th',attrs={'class':'th'})
+        #print(years)
 
+        for index,year in enumerate(years):
+            if re.search(f'{date}',year.text,re.I):
+                index_year = -(index+1)
+                years.reverse()
 
 
 def get_statements(event,context):
 
-    fillings = get_10_k_links(ticker)
+    fillings = get_10_k_links(event['ticker'])
 
-    for filling in fillings:
-        
+    for filling_dict in fillings:
+
+        filling = filling_dict['url']
+        filling_date = filling_dict['date']
+       
+        #time.sleep(1)
         filling_summary = filling+'/FilingSummary.xml'
 
         req = requests.get(filling_summary,headers=header_req)
@@ -92,16 +105,23 @@ def get_statements(event,context):
 
             if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                 if not income_state:
-                    parse_statement(True,file_url)
+                    parse_statement(True,file_url,filling_date)
                     income_state = True
 
             if "BALANCE" in report_name and "SHEET" in report_name:
                 if not balance_state:
-                    parse_statement(False,file_url)
+                    parse_statement(False,file_url,filling_date)
                     balance_state = True
 
             if "CASH FLOW" in report_name:
                 if not flow_state:
-                    parse_statement(True,file_url)
+                    parse_statement(True,file_url,filling_date)
                     flow_state = True
-        
+    
+
+
+
+
+
+
+
