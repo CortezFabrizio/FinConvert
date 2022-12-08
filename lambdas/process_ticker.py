@@ -57,30 +57,37 @@ def get_10_k_links(ticker):
 
 
 
-def parse_statement(non_balance,file_url,date):
+def parse_statement(non_balance,file_url,date,type):
+
+    def parse_columns():
+        pass
 
     req = requests.get(file_url,headers=header_req).text
 
-    rows_list = BeautifulSoup(req,features="html.parser").find('table',{"class": "report"}).find_all('tr')
-
+    content = BeautifulSoup(req,features="html.parser")
+    rows_list = content.find('table',{"class": "report"}).find_all('tr')
 
     if non_balance:
 
         years = (rows_list[1].find_all('th',attrs={'class':'th'}))
-        years.reverse()
 
-        #year_filling = rows_list[1].find('th',attrs={'class':'th'},text=re.compile(f'{date}',re.I)).getText()
 
-        #print(years)
-
-        for index,year in enumerate(years):
+        for index,year in  enumerate(reversed(years)):
             if re.search(f'{date}',year.text,re.I):
-                index_year = -(index+1)
-                years.reverse()
+                filling_year = len(years)-(index+1)
+                break
+                        
+        for row in rows_list[2:]:
+            cells = row.find_all('td')[1:][filling_year:]
 
+            if row.find_all('td',attrs={'class':re.compile('nump|num',re.I)}):
+
+                for cell in cells:
+                    pass
+                            
 
 def get_statements(event,context):
-
+    
     fillings = get_10_k_links(event['ticker'])
 
     for filling_dict in fillings:
@@ -105,20 +112,21 @@ def get_statements(event,context):
 
             if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                 if not income_state:
-                    parse_statement(True,file_url,filling_date)
+                    parse_statement(True,file_url,filling_date,'income')
                     income_state = True
 
             if "BALANCE" in report_name and "SHEET" in report_name:
                 if not balance_state:
-                    parse_statement(False,file_url,filling_date)
+                    parse_statement(False,file_url,filling_date,'balance')
                     balance_state = True
 
             if "CASH FLOW" in report_name:
                 if not flow_state:
-                    parse_statement(True,file_url,filling_date)
+                    parse_statement(True,file_url,filling_date,'flow')
                     flow_state = True
+        
     
-
+        
 
 
 
