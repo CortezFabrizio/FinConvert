@@ -38,7 +38,7 @@ def date_validation(date):
     date_l = date.split('-')
     dict_months = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'} 
     date_valid = dict_months[int(date_l[1])]+f'.*{date_l[2]}.*{date_l[0]}'
-    return date_valid
+    return {'regrex_expression':date_valid,'filling_year':date_l[0]}
 
 
 def get_10_k_links(ticker):
@@ -57,10 +57,8 @@ def get_10_k_links(ticker):
 
 
 
-def parse_statement(non_balance,file_url,date,type):
+def parse_statement(non_balance,file_url,date,year_filling):
 
-    def parse_columns():
-        pass
 
     req = requests.get(file_url,headers=header_req).text
 
@@ -69,31 +67,35 @@ def parse_statement(non_balance,file_url,date,type):
 
     if non_balance:
 
-        years = (rows_list[1].find_all('th',attrs={'class':'th'}))
-
+        years = rows_list[1].find_all('th',attrs={'class':'th'})
 
         for index,year in  enumerate(reversed(years)):
             if re.search(f'{date}',year.text,re.I):
                 filling_year = len(years)-(index+1)
+                valid_years = [year.getText() for year in years[filling_year:]]
+
                 break
                         
         for row in rows_list[2:]:
-            cells = row.find_all('td')[1:][filling_year:]
+            cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year:]
+            cells = row.find_all('td')
 
-            if row.find_all('td',attrs={'class':re.compile('nump|num',re.I)}):
+            if cells:
+                concept = row.find('td',attrs={'class':'pl'}).getText()
 
-                for cell in cells:
-                    pass
-                            
+            for cell in cells:
+                pass
+
 
 def get_statements(event,context):
-    
+
     fillings = get_10_k_links(event['ticker'])
 
     for filling_dict in fillings:
 
         filling = filling_dict['url']
-        filling_date = filling_dict['date']
+        filling_date = filling_dict['date']['regrex_expression']
+        filling_year = filling_dict['date']['filling_year']
        
         #time.sleep(1)
         filling_summary = filling+'/FilingSummary.xml'
@@ -112,17 +114,17 @@ def get_statements(event,context):
 
             if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                 if not income_state:
-                    parse_statement(True,file_url,filling_date,'income')
+                    parse_statement(True,file_url,filling_date,filling_year)
                     income_state = True
 
             if "BALANCE" in report_name and "SHEET" in report_name:
                 if not balance_state:
-                    parse_statement(False,file_url,filling_date,'balance')
+                    parse_statement(False,file_url,filling_date,filling_year)
                     balance_state = True
 
             if "CASH FLOW" in report_name:
                 if not flow_state:
-                    parse_statement(True,file_url,filling_date,'flow')
+                    parse_statement(True,file_url,filling_date,filling_year)
                     flow_state = True
         
     
