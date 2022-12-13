@@ -57,8 +57,11 @@ def get_10_k_links(ticker):
 
 
 
-def parse_statement(non_balance,file_url,date,year_filling):
+years_list = []
 
+filling_dict = {None:{}}
+
+def parse_statement(non_balance,file_url,date,year_filling):
 
     req = requests.get(file_url,headers=header_req).text
 
@@ -72,19 +75,59 @@ def parse_statement(non_balance,file_url,date,year_filling):
         for index,year in  enumerate(reversed(years)):
             if re.search(f'{date}',year.text,re.I):
                 filling_year = len(years)-(index+1)
-                valid_years = [year.getText() for year in years[filling_year:]]
 
+                valid_years = [int(year_filling)-year_column for year_column in range(0,len(years[filling_year:]))]
                 break
-                        
+
+        concept_title = None
+
         for row in rows_list[2:]:
+            
             cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year:]
-            cells = row.find_all('td')
 
             if cells:
                 concept = row.find('td',attrs={'class':'pl'}).getText()
 
-            for cell in cells:
-                pass
+                if concept in filling_dict[concept_title]:
+                    pass
+                else:
+                    filling_dict[concept_title][concept] = {}
+
+                for index,cell in enumerate(cells):
+
+                    year_key = valid_years[index]
+                    
+                    if year_key in years_list:
+                        continue
+
+                    else:
+                        if year_key in filling_dict[concept_title][concept]:
+                            continue
+                        else:
+
+                            cell_class = cell.get('class')[0]
+                            non_digit_filter = re.sub('\W','',cell.getText())
+
+                            if cell_class == 'num':
+                                non_digit_filter = f'({non_digit_filter})'
+
+                            filling_dict[concept_title][concept][year_key] = non_digit_filter
+
+            else:
+                concept_title = row.find('td',attrs={'class':'pl'}).getText()
+
+                if concept_title in filling_dict:
+                    pass
+                else:
+                    filling_dict[concept_title] = {}
+        
+        else:
+            for year in valid_years:
+                if year in years_list:
+                    continue
+                else:
+                    years_list.append(year)
+
 
 
 def get_statements(event,context):
@@ -126,8 +169,11 @@ def get_statements(event,context):
                 if not flow_state:
                     parse_statement(True,file_url,filling_date,filling_year)
                     flow_state = True
-        
-    
+
+
+
+
+
         
 
 
