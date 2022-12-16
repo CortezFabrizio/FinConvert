@@ -57,11 +57,7 @@ def get_10_k_links(ticker):
 
 
 
-years_list = []
-
-filling_dict = {None:{}}
-
-def parse_statement(non_balance,file_url,date,year_filling):
+def parse_statement(non_balance,file_url,date,year_filling,years_list,filling_dict):
 
     req = requests.get(file_url,headers=header_req).text
 
@@ -96,6 +92,7 @@ def parse_statement(non_balance,file_url,date,year_filling):
                 for index,cell in enumerate(cells):
 
                     year_key = valid_years[index]
+                    print(years_list)
                     
                     if year_key in years_list:
                         continue
@@ -128,17 +125,22 @@ def parse_statement(non_balance,file_url,date,year_filling):
                 else:
                     years_list.append(year)
 
-
+#3:32
 
 def get_statements(event,context):
 
     fillings = get_10_k_links(event['ticker'])
+
+
+    years_list = []
+    filling_concepts = {}
 
     for filling_dict in fillings:
 
         filling = filling_dict['url']
         filling_date = filling_dict['date']['regrex_expression']
         filling_year = filling_dict['date']['filling_year']
+        print(filling)
        
         #time.sleep(1)
         filling_summary = filling+'/FilingSummary.xml'
@@ -157,20 +159,18 @@ def get_statements(event,context):
 
             if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                 if not income_state:
-                    parse_statement(True,file_url,filling_date,filling_year)
+                    parse_statement(True,file_url,filling_date,filling_year,years_list,filling_concepts)
                     income_state = True
 
             if "BALANCE" in report_name and "SHEET" in report_name:
                 if not balance_state:
-                    parse_statement(False,file_url,filling_date,filling_year)
+                    parse_statement(False,file_url,filling_date,filling_year,years_list,filling_concepts)
                     balance_state = True
 
             if "CASH FLOW" in report_name:
                 if not flow_state:
-                    parse_statement(True,file_url,filling_date,filling_year)
+                    parse_statement(True,file_url,filling_date,filling_year,years_list,filling_concepts)
                     flow_state = True
-
-
 
 
 
