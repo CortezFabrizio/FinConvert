@@ -2,6 +2,7 @@ import re
 import requests
 import json
 import time
+import boto3
 from bs4 import BeautifulSoup
 
 sec_search_endpoint = 'https://efts.sec.gov/LATEST/search-index'
@@ -171,6 +172,20 @@ def get_statements(event,context):
                 if not flow_state:
                     parse_statement(True,file_url,filling_date,filling_year,years_list,filling_concepts)
                     flow_state = True
+    
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table('fabri_app')
+    table.put_item(
+
+            Item={'ticker':event['ticker'],
+                   'financial_concepts':filling_concepts
+            
+            }
+
+
+    )
+
+
 
 
 
