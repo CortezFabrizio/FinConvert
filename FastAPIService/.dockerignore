@@ -1,7 +1,0 @@
-Dockerfile
-node_modules
-.git
-.github
-venv
-.venv
-__pycache__
