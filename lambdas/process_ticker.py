@@ -58,7 +58,7 @@ def get_10_k_links(ticker):
 
 
 
-def parse_statement(non_balance,file_url,date,year_filling,years_list,filling_dict):
+def parse_statement(non_balance,file_url,date,year_filling,filling_dict):
 
     req = requests.get(file_url,headers=header_req).text
 
@@ -73,71 +73,42 @@ def parse_statement(non_balance,file_url,date,year_filling,years_list,filling_di
             if re.search(f'{date}',year.text,re.I):
                 filling_year = len(years)-(index+1)
 
-                valid_years = [int(year_filling)-year_column for year_column in range(0,len(years[filling_year:]))]
+                valid_years = [int(year_filling)-year_column for year_column in range(0,len(years[filling_year:])) if not int(year_filling)-year_column in filling_dict]
+
+                print(valid_years)
                 break
 
-        concept_title = None
 
         for row in rows_list[2:]:
-            
             cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year:]
 
             if cells:
                 concept = row.find('td',attrs={'class':'pl'}).getText()
 
-                if concept in filling_dict[concept_title]:
-                    pass
-                else:
-                    filling_dict[concept_title][concept] = {}
+                for year in valid_years:
+                    filling_dict[year] = {}
 
                 for index,cell in enumerate(cells):
 
                     year_key = valid_years[index]
-                    print(years_list)
-                    
-                    if year_key in years_list:
-                        continue
 
-                    else:
-                        if year_key in filling_dict[concept_title][concept]:
-                            continue
-                        else:
+                    cell_class = cell.get('class')[0]
+                    non_digit_filter = re.sub('\W','',cell.getText())
 
-                            cell_class = cell.get('class')[0]
-                            non_digit_filter = re.sub('\W','',cell.getText())
+                    if cell_class == 'num':
+                        non_digit_filter = f'({non_digit_filter})'
 
-                            if cell_class == 'num':
-                                non_digit_filter = f'({non_digit_filter})'
+                    filling_dict[year_key][concept] = non_digit_filter
 
-                            filling_dict[concept_title][concept][year_key] = non_digit_filter
-
-            else:
-                concept_title = row.find('td',attrs={'class':'pl'}).getText()
-
-                if concept_title in filling_dict:
-                    pass
-                else:
-                    filling_dict[concept_title] = {}
-        
-        else:
-            for year in valid_years:
-                if year in years_list:
-                    continue
-                else:
-                    years_list.append(year)
-
-#3:32
+       
 
 def get_statements(event,context):
 
+    statements = {'Balance':{},'Cash':{},'Income':{}}
+
     fillings = get_10_k_links(event['ticker'])
 
-
-    years_list = []
-    filling_concepts = {}
-
     for filling_dict in fillings:
-
         filling = filling_dict['url']
         filling_date = filling_dict['date']['regrex_expression']
         filling_year = filling_dict['date']['filling_year']
@@ -157,22 +128,24 @@ def get_statements(event,context):
             report_name = report.find('ShortName').getText().upper()
             html_file_name = report.find('HtmlFileName').getText()
             file_url = filling+f'/{html_file_name}'
+            print(file_url)
+            print('------=============================------------')
 
             if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                 if not income_state:
-                    parse_statement(True,file_url,filling_date,filling_year,years_list,filling_concepts)
+                    #parse_statement(True,file_url,filling_date,filling_year,statements)
                     income_state = True
 
             if "BALANCE" in report_name and "SHEET" in report_name:
                 if not balance_state:
-                    parse_statement(False,file_url,filling_date,filling_year,years_list,filling_concepts)
+                    parse_statement(False,file_url,filling_date,filling_year,statements['Balance'])
                     balance_state = True
 
             if "CASH FLOW" in report_name:
                 if not flow_state:
-                    parse_statement(True,file_url,filling_date,filling_year,years_list,filling_concepts)
+                    parse_statement(True,file_url,filling_date,filling_year,statements['Cash'])
                     flow_state = True
-    
+                    
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table('fabri_app')
     table.put_item(
