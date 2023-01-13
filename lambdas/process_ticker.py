@@ -57,7 +57,6 @@ def get_10_k_links(ticker):
     return list_adsh
 
 
-
 def parse_statement(non_balance,file_url,date,year_filling,filling_dict):
 
     req = requests.get(file_url,headers=header_req).text
@@ -73,20 +72,22 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict):
             if re.search(f'{date}',year.text,re.I):
                 filling_year = len(years)-(index+1)
 
-                valid_years = [int(year_filling)-year_column for year_column in range(0,len(years[filling_year:])) if not int(year_filling)-year_column in filling_dict]
+                valid_years = [ int(year_filling)-year_column for year_column in range(0,len(years[filling_year:])) if not int(year_filling)-year_column in filling_dict  ]
 
-                print(valid_years)
+                diff = len(years[filling_year:]) - len(valid_years)
+ 
+                for year in valid_years:
+                    if not year in filling_dict:
+                        filling_dict[year] = {}
+
                 break
 
 
         for row in rows_list[2:]:
-            cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year:]
+            cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year+diff:]
 
             if cells:
-                concept = row.find('td',attrs={'class':'pl'}).getText()
-
-                for year in valid_years:
-                    filling_dict[year] = {}
+    
 
                 for index,cell in enumerate(cells):
 
@@ -100,7 +101,6 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict):
 
                     filling_dict[year_key][concept] = non_digit_filter
 
-       
 
 def get_statements(event,context):
 
