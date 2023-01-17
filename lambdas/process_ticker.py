@@ -56,41 +56,46 @@ def get_10_k_links(ticker,start_date,end_date):
 
 
 
-def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date):
+
+def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date,is_income = False):
 
     req = requests.get(file_url,headers=header_req).text
 
     content = BeautifulSoup(req,features="html.parser")
     rows_list = content.find('table',{"class": "report"}).find_all('tr')
 
+    row_years_index = 1
+    rows__first_index_concepts = 2 
 
-    if non_balance:
+    if not non_balance:
+        row_years_index = 0
+        rows__first_index_concepts = 1
 
-        years = rows_list[1].find_all('th',attrs={'class':'th'})
 
-        for index,year in  enumerate(reversed(years)):
-            if re.search(f'{date}',year.text,re.I):
-                filling_year = len(years)-(index+1)
+    years = rows_list[row_years_index].find_all('th',attrs={'class':'th'})
 
-                valid_years = [ int(year_filling)-year_column for year_column in range(0,len(years[filling_year:])) if not int(year_filling)-year_column in filling_dict and int(year_filling)-year_column >= end_date  ]
+    for index,year in  enumerate(reversed(years)):
+        if re.search(f'{date}',year.text,re.I):
+            filling_year = len(years)-(index+1)
 
-                diff = len(years[filling_year:]) - len(valid_years)
+            valid_years = [ int(year_filling)-year_column for year_column in range(0,len(years[filling_year:])) if not int(year_filling)-year_column in filling_dict and int(year_filling)-year_column >= end_date  ]
 
-                for year in valid_years:
-                    filling_dict[year] = {}
+            diff = len(years[filling_year:]) - len(valid_years)
 
-                break
+            for year in valid_years:
+                filling_dict[year] = {}
 
-        concept_title = 'FirstBlock'
+            break
 
-        for row in rows_list[2:]:
-            cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year+diff:]
+    concept_title = 'FirstBlock'
 
-            if cells:
+    for row in rows_list[rows__first_index_concepts:]:
+        cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year+diff:]
+        
+        if cells:
 
-                concept = row.find('td',attrs={'class':'pl'}).getText()
-       
-
+                concept = row.find('td',attrs={'class':'pl'}).getText()    
+                
                 for index,cell in enumerate(cells):
 
                     year_key = valid_years[index]
@@ -106,13 +111,12 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
                     except:
                         filling_dict[year_key][concept_title] = {concept:non_digit_filter}
 
-                  
-
-            else:
+                
+        else:
                 try:
                     concept_title = row.find('td',attrs={'class':'pl'}).getText()
                 except:
-                    continue
+                    continue   
 
 
 
@@ -147,8 +151,7 @@ def get_statements(event,context):
          
             if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                 if not income_state:
-                    parse_statement(True,file_url,filling_date,filling_year,statements['Income'],start_date)
-
+                    parse_statement(True,file_url,filling_date,filling_year,statements['Income'],start_date,True)
                     income_state = True
 
             if "BALANCE" in report_name and "SHEET" in report_name:
@@ -160,4 +163,7 @@ def get_statements(event,context):
                 if not flow_state:
                     parse_statement(True,file_url,filling_date,filling_year,statements['Cash'],start_date)
                     flow_state = True
+
+
+
 
