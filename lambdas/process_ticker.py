@@ -3,6 +3,7 @@ import requests
 import json
 import time
 from bs4 import BeautifulSoup
+import boto3
 
 sec_search_endpoint = 'https://efts.sec.gov/LATEST/search-index'
 
@@ -17,19 +18,16 @@ header_req = {
 
 
 def search_cik(ticker):
-    print(ticker)
 
     payload_d = json.dumps({"keysTyped":ticker})
 
     req_index = requests.post(url=sec_search_endpoint,data=payload_d,headers=header_req)
-
     first_result = req_index.json()["hits"]["hits"][0]
-    if first_result['_source']['tickers'] == ticker:
+    if ticker in  first_result['_source']['tickers']:
 
         cik_without_0 = first_result['_id']
         cik = '0'*(10-len(cik_without_0))+cik_without_0
-
-    return cik
+        return cik
 
 
 def date_validation(date):
@@ -56,6 +54,10 @@ def get_10_k_links(ticker,start_date,end_date):
 
 
 
+#years_list = []
+
+#filling_dict = {}
+
 
 def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date,is_income = False):
 
@@ -64,8 +66,11 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
     content = BeautifulSoup(req,features="html.parser")
     rows_list = content.find('table',{"class": "report"}).find_all('tr')
 
-    row_years_index = 1
-    rows__first_index_concepts = 2 
+    if non_balance:
+        row_years_index = 1
+        rows__first_index_concepts = 2
+        if is_income and not rows_list[2].find_all('td',attrs={'class':re.compile('nump|num',re.I)}):
+            rows__first_index_concepts = 3
 
     if not non_balance:
         row_years_index = 0
@@ -78,7 +83,7 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
         if re.search(f'{date}',year.text,re.I):
             filling_year = len(years)-(index+1)
 
-            valid_years = [ int(year_filling)-year_column for year_column in range(0,len(years[filling_year:])) if not int(year_filling)-year_column in filling_dict and int(year_filling)-year_column >= end_date  ]
+            valid_years = [ str(int(year_filling)-year_column) for year_column in range(0,len(years[filling_year:])) if not int(year_filling)-year_column in filling_dict and int(year_filling)-year_column >= end_date  ]
 
             diff = len(years[filling_year:]) - len(valid_years)
 
@@ -91,8 +96,11 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
 
     for row in rows_list[rows__first_index_concepts:]:
         cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year+diff:]
+
+        sub_concept = row.find('td',attrs={'class':'pl'})
+        m = sub_concept.find('strong')
         
-        if cells:
+        if not m and cells:
 
                 concept = row.find('td',attrs={'class':'pl'}).getText()    
                 
@@ -101,7 +109,7 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
                     year_key = valid_years[index]
 
                     cell_class = cell.get('class')[0]
-                    non_digit_filter = re.sub('\W','',cell.getText())
+                    non_digit_filter = re.sub('\D','',cell.getText())
 
                     if cell_class == 'num':
                         non_digit_filter = f'({non_digit_filter})'
@@ -116,25 +124,21 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
                 try:
                     concept_title = row.find('td',attrs={'class':'pl'}).getText()
                 except:
-                    continue   
+                    continue        
+   
+#3:32
 
+def get_statements(ticker,start_date,end_date):
 
+    statements = {'ticker':ticker,'Balance':{},'Cash':{},'Income':{}}
 
-def get_statements(event,context):
-
-    start_date = event['start_date']
-    end_date = event['end_date']
-
-    statements = {'Balance':{},'Cash':{},'Income':{}}
-
-    fillings = get_10_k_links(event['ticker'],start_date,end_date)
+    fillings = get_10_k_links(ticker,start_date,end_date)
 
     for filling_dict in fillings:
         filling = filling_dict['url']
         filling_date = filling_dict['date']['regrex_expression']
         filling_year = filling_dict['date']['filling_year']
        
-        #time.sleep(1)
         filling_summary = filling+'/FilingSummary.xml'
 
         req = requests.get(filling_summary,headers=header_req)
@@ -163,6 +167,21 @@ def get_statements(event,context):
                 if not flow_state:
                     parse_statement(True,file_url,filling_date,filling_year,statements['Cash'],start_date)
                     flow_state = True
+
+
+    return statements
+
+
+
+def insert_table():
+    table = boto3.resource('dynamodb').Table('fabri_app')
+
+    item_put = table.put_item(
+    Item=get_statements('GOOG',2013,2023)
+
+    )
+
+insert_table()
 
 
 
