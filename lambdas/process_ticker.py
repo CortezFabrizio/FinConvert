@@ -53,7 +53,6 @@ def get_10_k_links(ticker,start_date,end_date):
     return list_adsh
 
 
-
 #years_list = []
 
 #filling_dict = {}
@@ -93,12 +92,10 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
             break
 
     concept_title = 'FirstBlock'
-
     for row in rows_list[rows__first_index_concepts:]:
         cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year+diff:]
-
         sub_concept = row.find('td',attrs={'class':'pl'})
-        m = sub_concept.find('strong')
+        m = sub_concept.find('strong') if sub_concept else True
         
         if not m and cells:
 
@@ -130,7 +127,7 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
 
 def get_statements(ticker,start_date,end_date):
 
-    statements = {'ticker':ticker,'Balance':{},'Cash':{},'Income':{}}
+    statements = {'Balance':{},'Cash':{},'Income':{}}
 
     fillings = get_10_k_links(ticker,start_date,end_date)
 
@@ -152,7 +149,6 @@ def get_statements(ticker,start_date,end_date):
             report_name = report.find('ShortName').getText().upper()
             html_file_name = report.find('HtmlFileName').getText()
             file_url = filling+f'/{html_file_name}'
-         
             if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                 if not income_state:
                     parse_statement(True,file_url,filling_date,filling_year,statements['Income'],start_date,True)
@@ -168,21 +164,46 @@ def get_statements(ticker,start_date,end_date):
                     parse_statement(True,file_url,filling_date,filling_year,statements['Cash'],start_date)
                     flow_state = True
 
-
     return statements
 
 
 
-def insert_table():
+def insert_table(ticker,end_date,start_date):
+
+    statements_results = get_statements(ticker,end_date,start_date)
+
+    update_expression = ''
+    update_values = {}
+
+    for statement in statements_results:
+        
+        for year in statements_results[statement]:
+
+            sheet = statements_results[statement][year]
+
+            attr_value = f':{statement}{year}'
+
+            if update_expression:
+                update_expression += f', {statement}.y{year} = {attr_value}'
+                update_values[attr_value] = sheet
+
+            else:
+                update_expression += f'SET {statement}.y{year} = {attr_value}'
+                update_values[attr_value] = sheet
+
     table = boto3.resource('dynamodb').Table('fabri_app')
 
-    item_put = table.put_item(
-    Item=get_statements('GOOG',2013,2023)
+    response = table.update_item(
+        Key={
+            'ticker': ticker
+        },
+     
+        UpdateExpression=update_expression,
+
+
+        ExpressionAttributeValues=
+            update_values,
 
     )
-
-insert_table()
-
-
 
 
