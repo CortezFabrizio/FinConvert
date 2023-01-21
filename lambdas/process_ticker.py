@@ -5,6 +5,7 @@ import time
 from bs4 import BeautifulSoup
 import boto3
 
+
 sec_search_endpoint = 'https://efts.sec.gov/LATEST/search-index'
 
 header_req = {
@@ -76,11 +77,16 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
         rows__first_index_concepts = 1
 
 
-    years = rows_list[row_years_index].find_all('th',attrs={'class':'th'})
+    row_years = rows_list[row_years_index].find_all('th',attrs={'class':'th'})
 
-    for index,year in  enumerate(reversed(years)):
+    years = [year_row for year_row in row_years if re.findall("Jan.*\d{4}|Feb.*\d{4}|Mar.*\d{4}|Apr.*\d{4}|May.*\d{4}|Jun.*\d{4}|Jul.*\d{4}|Aug.*\d{4}|Sep.*\d{4}|Oct.*\d{4}|Nov.*\d{4}|Dec.*\d{4}", year_row.getText())]
+
+    for index,year in enumerate(reversed(years)):
         if re.search(f'{date}',year.text,re.I):
+
             filling_year = len(years)-(index+1)
+
+            print(date,filling_year,len(years),index,index+1)
 
             valid_years = [ str(int(year_filling)-year_column) for year_column in range(0,len(years[filling_year:])) if not int(year_filling)-year_column in filling_dict and int(year_filling)-year_column >= end_date  ]
 
@@ -93,10 +99,11 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
 
     concept_title = 'FirstBlock'
     for row in rows_list[rows__first_index_concepts:]:
+        
         cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year+diff:]
         sub_concept = row.find('td',attrs={'class':'pl'})
         m = sub_concept.find('strong') if sub_concept else True
-        
+    
         if not m and cells:
 
                 concept = row.find('td',attrs={'class':'pl'}).getText()    
@@ -123,7 +130,6 @@ def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date
                 except:
                     continue        
    
-#3:32
 
 def get_statements(ticker,start_date,end_date):
 
@@ -151,6 +157,7 @@ def get_statements(ticker,start_date,end_date):
             file_url = filling+f'/{html_file_name}'
             if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                 if not income_state:
+                    print(file_url)
                     parse_statement(True,file_url,filling_date,filling_year,statements['Income'],start_date,True)
                     income_state = True
 
