@@ -212,5 +212,51 @@ def insert_table(ticker,end_date,start_date):
             update_values,
 
     )
+    
+    
+def create_excel(statements):
+
+    wb = Workbook()
+    sheet = wb.worksheets[0]
+
+    row_index=3
+
+
+    for statement in statements:
+
+        column_index = 1
+        if statement == 'Balance':
+            column_index = 6
+        if statement == 'Cash':
+            column_index = 12
+
+        sheet.cell(row=1,column=column_index ,value=statement)
+
+        #len_row = len(statements[statement])
+
+        for year in statements[statement]:
+            sheet.cell(row=row_index,column=column_index+1,value=year)
+
+            for concept_title in statements[statement][year]:
+
+                sheet.cell(row=row_index+1,column=column_index+1,value=concept_title)
+                concepts = statements[statement][year][concept_title]
+                row_index+=1
+
+                for concept in concepts:
+                    value = concepts[concept]
+                    sheet.cell(row=row_index+1,column=column_index+2,value=concept)
+                    sheet.cell(row=row_index+1,column=column_index+3,value=value)
+                    row_index+=1
+
+                else:
+                    row_index+=2
+            
+            row_index+=4
+
+
+        else:
+            row_index = 3
+
 
 
