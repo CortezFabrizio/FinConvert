@@ -33,6 +33,23 @@ def read_root(ticker:str,start_date:int,end_date:int):
     "cache-control": "no-cache",
     "referer":"https://www.sec.gov/"
     }
+    
+    def check_years(company_ticker,date_start,date_end):
+        table = boto3.resource('dynamodb').Table('fabri_app')
+
+        response_item = table.get_item(
+        Key={
+            'ticker':company_ticker
+        },
+        AttributesToGet=[
+            'Balance'
+        ])
+
+        years_difference = date_end-date_start
+        year_to_check = [f'y{date_end-year_difference}'  for year_difference in years_difference if f'y{date_end-year_difference}' not in response_item['Item']['Balance']]
+
+
+        return year_to_check
 
 
     def search_cik(ticker):
