@@ -5,18 +5,12 @@ from pydantic import BaseModel
 
 import re
 import requests
-import json
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
 from tempfile import NamedTemporaryFile
 
 
 app = FastAPI()
-
-
-class Ticker(BaseModel):
-    name: str
-
 
 @app.get("/get-ticker")
 def read_root(ticker:str,start_date:int,end_date:int):
@@ -33,36 +27,78 @@ def read_root(ticker:str,start_date:int,end_date:int):
     "cache-control": "no-cache",
     "referer":"https://www.sec.gov/"
     }
+
     
-    def check_years(company_ticker,date_start,date_end):
+    def search_cik(ticker):
+
+            payload_d = json.dumps({"keysTyped":ticker})
+
+            req_index = requests.post(url=sec_search_endpoint,data=payload_d,headers=header_req)
+            first_result = req_index.json()["hits"]["hits"][0]
+            if ticker in first_result['_source']['tickers']:
+
+                cik_without_0 = first_result['_id']
+                cik = '0'*(10-len(cik_without_0))+cik_without_0
+                return cik
+
+
+    def check_years(date_start,date_end):
+
+        years_difference = date_end-date_start
+
+        if search_cik(ticker):
+            table = boto3.resource('dynamodb').Table('fabri_app')
+
+
+            response_item = table.get_item(
+            Key={
+                'ticker':ticker
+            },
+            AttributesToGet=[
+                'Balance','Cash','Income'
+            ])
+            
+            if 'Item' in response_item:
+
+                income_attr = response_item['Item']['Income']
+                balance_attr = response_item['Item']['Balance']
+                cash_attr = response_item['Item']['Cash']
+
+                year_to_get = []
+                year_to_check = []
+
+                for year_difference in range(years_difference+1):
+                    key_year = f'y{date_end-year_difference}'
+                    if key_year not in income_attr and f'y{date_end-year_difference}' not in balance_attr and f'y{date_end-year_difference}' not in cash_attr:
+                        year_to_check.append(date_end-year_difference)
+                    else:
+                        year_to_get.append(key_year)
+                    
+
+                return year_to_check
+
+            else:
+                table.put_item(
+                    Item={
+                        'ticker':ticker,
+                        'Balance':{},
+                        'Income':{},
+                        'Cash':{}
+                    }
+                )
+                year_to_check = [date_end-year_difference  for year_difference in range(years_difference+1)]
+                return year_to_check
+
+
+
+    def check_ite_exists():
         table = boto3.resource('dynamodb').Table('fabri_app')
 
         response_item = table.get_item(
         Key={
-            'ticker':company_ticker
-        },
-        AttributesToGet=[
-            'Balance'
-        ])
+            'ticker':'dgdg'
+        })
 
-        years_difference = date_end-date_start
-        year_to_check = [f'y{date_end-year_difference}'  for year_difference in years_difference if f'y{date_end-year_difference}' not in response_item['Item']['Balance']]
-
-
-        return year_to_check
-
-
-    def search_cik(ticker):
-
-        payload_d = json.dumps({"keysTyped":ticker})
-
-        req_index = requests.post(url=sec_search_endpoint,data=payload_d,headers=header_req)
-        first_result = req_index.json()["hits"]["hits"][0]
-        if ticker in  first_result['_source']['tickers']:
-
-            cik_without_0 = first_result['_id']
-            cik = '0'*(10-len(cik_without_0))+cik_without_0
-            return cik
 
 
     def date_validation(date):
@@ -93,7 +129,7 @@ def read_root(ticker:str,start_date:int,end_date:int):
     #filling_dict = {}
 
 
-    def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date,is_income = False):
+    def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date,is_income = False,valid_years_list=False):
 
         req = requests.get(file_url,headers=header_req).text
 
@@ -120,17 +156,16 @@ def read_root(ticker:str,start_date:int,end_date:int):
 
                 filling_year = len(years)-(index+1)
 
-                #print(date,filling_year,len(years),index,index+1)
-
                 valid_years = [ str(int(year_filling)-year_column) for year_column in range(0,len(years[filling_year:])) if not str(int(year_filling)-year_column) in filling_dict and int(year_filling)-year_column >= end_date  ]
 
                 diff = len(years[filling_year:]) - len(valid_years)
 
                 for year in valid_years:
-                    filling_dict[year] = {}
+                    if int(year) in valid_years_list:
+                        filling_dict[year] = {}
 
                 break
-     
+
 
         concept_title = 'FirstBlock'
         for row in rows_list[rows__first_index_concepts:]:
@@ -141,7 +176,7 @@ def read_root(ticker:str,start_date:int,end_date:int):
             cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year+diff-len_cells:]
             sub_concept = row.find('td',attrs={'class':'pl'})
             m = sub_concept.find('strong') if sub_concept else True
-        
+                    
             if not m and cells:
 
                     concept = row.find('td',attrs={'class':'pl'}).getText()    
@@ -149,6 +184,8 @@ def read_root(ticker:str,start_date:int,end_date:int):
                     for index,cell in enumerate(cells):
 
                         year_key = valid_years[index]
+                        if int(year_key) not in valid_years_list:
+                            continue
 
                         cell_class = cell.get('class')[0]
                         non_digit_filter = re.sub('\D','',cell.getText())
@@ -166,11 +203,16 @@ def read_root(ticker:str,start_date:int,end_date:int):
                         concept_title = row.find('td',attrs={'class':'pl'}).getText()
                     except:
                         continue        
-    
 
-    def get_statements(ticker,start_date,end_date):
+
+    def get_statements(ticker,start_date,end_date,valid_years_list):
+
+
 
         statements = {'Balance':{},'Cash':{},'Income':{}}
+
+        if not valid_years_list:
+            return statements
 
         fillings = get_10_k_links(ticker,start_date,end_date)
 
@@ -194,26 +236,23 @@ def read_root(ticker:str,start_date:int,end_date:int):
                 file_url = filling+f'/{html_file_name}'
                 if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                     if not income_state:
-                        parse_statement(True,file_url,filling_date,filling_year,statements['Income'],start_date,True)
+                        parse_statement(True,file_url,filling_date,filling_year,statements['Income'],start_date,True,valid_years_list= valid_years_list)
                         income_state = True
 
                 if "BALANCE" in report_name and "SHEET" in report_name:
                     if not balance_state:
-                        parse_statement(False,file_url,filling_date,filling_year,statements['Balance'],start_date)
+                        parse_statement(False,file_url,filling_date,filling_year,statements['Balance'],start_date,valid_years_list= valid_years_list)
                         balance_state = True
 
                 if "CASH FLOW" in report_name:
                     if not flow_state:
-                        parse_statement(True,file_url,filling_date,filling_year,statements['Cash'],start_date)
+                        parse_statement(True,file_url,filling_date,filling_year,statements['Cash'],start_date, valid_years_list= valid_years_list)
                         flow_state = True
 
         return statements
 
-    financial_statements = get_statements(ticker,start_date,end_date)
 
-
-
-    def create_excel(financial_statements):
+    def create_excel(statements):
 
         wb = Workbook()
         sheet = wb.worksheets[0]
@@ -221,7 +260,7 @@ def read_root(ticker:str,start_date:int,end_date:int):
         row_index=3
 
 
-        for statement in financial_statements:
+        for statement in statements:
 
             column_index = 1
             if statement == 'Balance':
@@ -262,13 +301,12 @@ def read_root(ticker:str,start_date:int,end_date:int):
                 stream = tmp.read()
 
         s3_resource = boto3.resource('s3') 
-        s3_resource.Object('fabri-app','test00009.xlsx').put(Body=stream) 
+        s3_resource.Object('fabri-app',f'{ticker}.xlsx').put(Body=stream) 
 
-        
 
-    def insert_table(financial_statements,ticker):
 
-        statements_results = financial_statements
+    def insert_table(resuslts):
+        statements_results = resuslts
 
         update_expression = ''
         update_values = {}
@@ -289,6 +327,7 @@ def read_root(ticker:str,start_date:int,end_date:int):
                     update_expression += f'SET {statement}.y{year} = {attr_value}'
                     update_values[attr_value] = sheet
 
+
         table = boto3.resource('dynamodb').Table('fabri_app')
 
         response = table.update_item(
@@ -296,7 +335,6 @@ def read_root(ticker:str,start_date:int,end_date:int):
                 'ticker': ticker
             },
             UpdateExpression=update_expression,
-
 
             ExpressionAttributeValues=
                 update_values,
