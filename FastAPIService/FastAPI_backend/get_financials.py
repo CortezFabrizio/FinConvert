@@ -28,7 +28,9 @@ def read_root(ticker:str,start_date:int,end_date:int):
     "referer":"https://www.sec.gov/"
     }
 
+    statements_structure = {'Balance':{},'Cash':{},'Income':{}}
     
+
     def search_cik(ticker):
 
             payload_d = json.dumps({"keysTyped":ticker})
@@ -69,11 +71,17 @@ def read_root(ticker:str,start_date:int,end_date:int):
 
                 for year_difference in range(years_difference+1):
                     key_year = f'y{date_end-year_difference}'
-                    if key_year not in income_attr and f'y{date_end-year_difference}' not in balance_attr and f'y{date_end-year_difference}' not in cash_attr:
+
+                    if key_year not in income_attr and key_year not in balance_attr and key_year not in cash_attr:
                         year_to_check.append(date_end-year_difference)
+
                     else:
                         year_to_get.append(key_year)
-                    
+
+                        statements_structure['Balance'][key_year] = json.loads( balance_attr[key_year])
+                        statements_structure['Income'][key_year] = json.loads( income_attr[key_year])
+                        statements_structure['Cash'][key_year] = json.loads( cash_attr[key_year])
+
 
                 return year_to_check
 
@@ -98,7 +106,6 @@ def read_root(ticker:str,start_date:int,end_date:int):
         Key={
             'ticker':'dgdg'
         })
-
 
 
     def date_validation(date):
@@ -207,12 +214,10 @@ def read_root(ticker:str,start_date:int,end_date:int):
 
     def get_statements(ticker,start_date,end_date,valid_years_list):
 
-
-
         statements = {'Balance':{},'Cash':{},'Income':{}}
 
         if not valid_years_list:
-            return statements
+            return False
 
         fillings = get_10_k_links(ticker,start_date,end_date)
 
@@ -248,6 +253,10 @@ def read_root(ticker:str,start_date:int,end_date:int):
                     if not flow_state:
                         parse_statement(True,file_url,filling_date,filling_year,statements['Cash'],start_date, valid_years_list= valid_years_list)
                         flow_state = True
+                    
+        statements_structure['Balance'].update(statements['Balance'])
+        statements_structure['Income'].update(statements['Income'])
+        statements_structure['Cash'].update(statements['Cash'])
 
         return statements
 
@@ -341,4 +350,12 @@ def read_root(ticker:str,start_date:int,end_date:int):
         )
 
 
-    return json.dumps(financial_statements)
+    statements_results = get_statements(ticker,start_date,end_date,check_years(start_date,end_date))
+
+    if statements_results:
+        insert_table(resuslts=statements_results)
+        create_excel(statements_results)
+
+
+    return json.dumps(statements_structure)
+
