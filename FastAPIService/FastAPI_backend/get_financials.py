@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,Response
+from fastapi.responses import FileResponse
+
 import json
 import boto3
 from pydantic import BaseModel
-
+import time
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -12,10 +14,13 @@ from tempfile import NamedTemporaryFile
 
 app = FastAPI()
 
-@app.get("/get-ticker")
-def read_root(ticker:str,start_date:int,end_date:int):
 
-    #parameter = {'ticker':ticker}
+@app.get("/get-ticker")
+def read_root(ticker:str,start_date:int,end_date:int,response:Response):
+
+    response.headers['Access-Control-Allow-Origin'] = '*'
+
+    file_path = None
 
     sec_search_endpoint = 'https://efts.sec.gov/LATEST/search-index'
 
@@ -59,7 +64,7 @@ def read_root(ticker:str,start_date:int,end_date:int):
             AttributesToGet=[
                 'Balance','Cash','Income'
             ])
-            
+
             if 'Item' in response_item:
 
                 income_attr = response_item['Item']['Income']
@@ -70,7 +75,7 @@ def read_root(ticker:str,start_date:int,end_date:int):
                 year_to_check = []
 
                 for year_difference in range(years_difference+1):
-                    key_year = f'y{date_end-year_difference}'
+                    key_year = f'{date_end-year_difference}'
 
                     if key_year not in income_attr and key_year not in balance_attr and key_year not in cash_attr:
                         year_to_check.append(date_end-year_difference)
@@ -78,9 +83,9 @@ def read_root(ticker:str,start_date:int,end_date:int):
                     else:
                         year_to_get.append(key_year)
 
-                        statements_structure['Balance'][key_year] = json.loads( balance_attr[key_year])
-                        statements_structure['Income'][key_year] = json.loads( income_attr[key_year])
-                        statements_structure['Cash'][key_year] = json.loads( cash_attr[key_year])
+                        statements_structure['Balance'][key_year] = balance_attr[key_year]
+                        statements_structure['Income'][key_year] = income_attr[key_year]
+                        statements_structure['Cash'][key_year] = cash_attr[key_year]
 
 
                 return year_to_check
@@ -96,16 +101,6 @@ def read_root(ticker:str,start_date:int,end_date:int):
                 )
                 year_to_check = [date_end-year_difference  for year_difference in range(years_difference+1)]
                 return year_to_check
-
-
-
-    def check_ite_exists():
-        table = boto3.resource('dynamodb').Table('fabri_app')
-
-        response_item = table.get_item(
-        Key={
-            'ticker':'dgdg'
-        })
 
 
     def date_validation(date):
@@ -305,13 +300,8 @@ def read_root(ticker:str,start_date:int,end_date:int):
             else:
                 row_index = 3
 
-        with NamedTemporaryFile() as tmp:
-                wb.save(tmp.name)
-                stream = tmp.read()
 
-        s3_resource = boto3.resource('s3') 
-        s3_resource.Object('fabri-app',f'{ticker}.xlsx').put(Body=stream) 
-
+        return wb
 
 
     def insert_table(resuslts):
@@ -319,6 +309,7 @@ def read_root(ticker:str,start_date:int,end_date:int):
 
         update_expression = ''
         update_values = {}
+        update_names = {}
 
         for statement in statements_results:
 
@@ -328,12 +319,15 @@ def read_root(ticker:str,start_date:int,end_date:int):
 
                 attr_value = f':{statement}{year}'
 
+                if f'#{year}' not in update_names:
+                    update_names[f'#{year}'] = year
+
                 if update_expression:
-                    update_expression += f', {statement}.y{year} = {attr_value}'
+                    update_expression += f', {statement}.#{year} = {attr_value}'
                     update_values[attr_value] = sheet
 
                 else:
-                    update_expression += f'SET {statement}.y{year} = {attr_value}'
+                    update_expression += f'SET {statement}.#{year} = {attr_value}'
                     update_values[attr_value] = sheet
 
 
@@ -345,16 +339,22 @@ def read_root(ticker:str,start_date:int,end_date:int):
             },
             UpdateExpression=update_expression,
 
+            ExpressionAttributeNames=update_names,
+
             ExpressionAttributeValues=
                 update_values,
         )
 
 
-    statements_results = get_statements(ticker,start_date,end_date,check_years(start_date,end_date))
+    results = get_statements(ticker,start_date,end_date,check_years(start_date,end_date))
 
-    if statements_results:
-        insert_table(resuslts=statements_results)
-        create_excel(statements_results)
+    if results:
+        excel = create_excel(results)
+        with NamedTemporaryFile() as tmp:
+                file_path = tmp.name
+                excel.save(file_path)
+                stream = tmp.read()
+                return FileResponse(file_path,filename=f'{ticker}.xlsx')
 
 
     return json.dumps(statements_structure)
