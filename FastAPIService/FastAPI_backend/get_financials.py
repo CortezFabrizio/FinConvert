@@ -158,13 +158,22 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
 
                 filling_year = len(years)-(index+1)
 
-                valid_years = [ str(int(year_filling)-year_column) for year_column in range(0,len(years[filling_year:])) if not str(int(year_filling)-year_column) in filling_dict and int(year_filling)-year_column >= end_date  ]
+                valid_years = []
+                invalid_years_index = []
 
-                diff = len(years[filling_year:]) - len(valid_years)
+                for index_year in range(0,len(years[filling_year:])):
 
-                for year in valid_years:
-                    if int(year) in valid_years_list:
-                        filling_dict[year] = {}
+                    current_year = int(year_filling)-index_year
+
+                    if current_year not in valid_years_list or current_year < end_date:
+                        invalid_years_index.insert(0,index_year)
+                        continue
+
+                    if current_year in filling_dict:
+                        continue
+                    else:
+                        valid_years.append(str(current_year))
+                        filling_dict[str(current_year)] = {}
 
                 break
 
@@ -180,6 +189,9 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
             m = sub_concept.find('strong') if sub_concept else True
                     
             if not m and cells:
+                
+                    for invalid_index in invalid_years_index:
+                            cells.pop(invalid_index)
 
                     concept = row.find('td',attrs={'class':'pl'}).getText()    
 
