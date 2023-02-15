@@ -53,7 +53,11 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
 
         years_difference = date_end-date_start
 
+        years_to_get = [str(date_end-difference) for difference in range(years_difference+1)]
+
+
         if search_cik(ticker):
+
             table = boto3.resource('dynamodb').Table('fabri_app')
 
 
@@ -66,41 +70,33 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
             ])
 
             if 'Item' in response_item:
-
-                income_attr = response_item['Item']['Income']
-                balance_attr = response_item['Item']['Balance']
-                cash_attr = response_item['Item']['Cash']
-
-                year_to_get = []
                 year_to_check = []
 
-                for year_difference in range(years_difference+1):
-                    key_year = f'{date_end-year_difference}'
+                attributes = response_item['Item']
 
-                    if key_year not in income_attr and key_year not in balance_attr and key_year not in cash_attr:
-                        year_to_check.append(date_end-year_difference)
+                for year in attributes:
+                    if year not in years_to_get:
+
+                        year_to_check.append(year)
 
                     else:
-                        year_to_get.append(key_year)
-
-                        statements_structure['Balance'][key_year] = balance_attr[key_year]
-                        statements_structure['Income'][key_year] = income_attr[key_year]
-                        statements_structure['Cash'][key_year] = cash_attr[key_year]
-
+                        statements_structure[year] = {'Income' : attributes[year]['Income']}
+                        statements_structure[year] = {'Balance' : attributes[year]['Balance']}
+                        statements_structure[year] = {'Cash' : attributes[year]['Cash']}
 
                 return year_to_check
 
             else:
+                item_dict = {'ticker':ticker}
+                for year in years_to_get:
+                    item_dict[year] = {}
+
+
                 table.put_item(
-                    Item={
-                        'ticker':ticker,
-                        'Balance':{},
-                        'Income':{},
-                        'Cash':{}
-                    }
+                    Item=item_dict
                 )
-                year_to_check = [date_end-year_difference  for year_difference in range(years_difference+1)]
-                return year_to_check
+
+                return years_to_get
 
 
     def date_validation(date):
@@ -316,31 +312,32 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
         return wb
 
 
-    def insert_table(resuslts):
+   def insert_table(resuslts):
         statements_results = resuslts
 
         update_expression = ''
         update_values = {}
         update_names = {}
 
-        for statement in statements_results:
+        for year in statements_results:
 
-            for year in statements_results[statement]:
+            for statement in statements_results[year]:
 
-                sheet = json.dumps(statements_results[statement][year])
+                sheet = json.dumps(statements_results[year][statement])
 
-                attr_value = f':{statement}{year}'
+                attr_value = f':{year}{statement}'
 
                 if f'#{year}' not in update_names:
                     update_names[f'#{year}'] = year
 
                 if update_expression:
-                    update_expression += f', {statement}.#{year} = {attr_value}'
+                    update_expression += f', #{year}.{statement} = {attr_value}'
                     update_values[attr_value] = sheet
 
                 else:
-                    update_expression += f'SET {statement}.#{year} = {attr_value}'
+                    update_expression += f'SET #{year}.{statement} = {attr_value}'
                     update_values[attr_value] = sheet
+
 
 
         table = boto3.resource('dynamodb').Table('fabri_app')
