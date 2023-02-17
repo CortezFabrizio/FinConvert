@@ -33,7 +33,7 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
     "referer":"https://www.sec.gov/"
     }
 
-    statements_structure = {'Balance':{},'Cash':{},'Income':{}}
+    statements_structure = {}
     
 
     def search_cik(ticker):
@@ -49,7 +49,7 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
                 return cik
 
 
-    def check_years(date_start,date_end):
+def check_years(date_start,date_end):
 
         years_difference = date_end-date_start
 
@@ -64,18 +64,16 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
             response_item = table.get_item(
             Key={
                 'ticker':ticker
-            },
-            AttributesToGet=[
-                'Balance','Cash','Income'
-            ])
+                }
+            )
 
             if 'Item' in response_item:
                 year_to_check = []
 
                 attributes = response_item['Item']
 
-                for year in attributes:
-                    if year not in years_to_get:
+                for year in years_to_get:
+                    if year not in attributes:
 
                         year_to_check.append(year)
 
@@ -122,12 +120,8 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
         return list_adsh
 
 
-    #years_list = []
 
-    #filling_dict = {}
-
-
-    def parse_statement(non_balance,file_url,date,year_filling,filling_dict,end_date,is_income = False,valid_years_list=False):
+   def parse_statement(type,non_balance,file_url,date,year_filling,end_date,is_income = False,valid_years_list=False):
 
         req = requests.get(file_url,headers=header_req).text
 
@@ -156,58 +150,59 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
 
                 valid_years = []
                 invalid_years_index = []
-
                 for index_year in range(0,len(years[filling_year:])):
 
-                    current_year = int(year_filling)-index_year
-
-                    if current_year not in valid_years_list or current_year < end_date:
+                    current_year = str(int(year_filling)-index_year)
+                    if current_year not in valid_years_list or int(current_year) < end_date:
                         invalid_years_index.insert(0,index_year)
                         continue
 
-                    if current_year in filling_dict:
+                    valid_years.append(current_year)
+                    if current_year in alternative_dict:
+                        alternative_dict[current_year][type] = {}
                         continue
                     else:
-                        valid_years.append(str(current_year))
-                        filling_dict[str(current_year)] = {}
+                        alternative_dict[current_year] = {type:{}}
 
-                break
-
+                break   
 
         concept_title = 'FirstBlock'
         for row in rows_list[rows__first_index_concepts:]:
 
-            cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})
-            len_cells = len(years)-len(cells)
+            cells_total = row.find_all('td',attrs={'class':re.compile('nump|num|text',re.I)})
+            len_cells = len(years)-len(cells_total)
+
+            cells = row.find_all('td',attrs={'class':re.compile('nump|num|text',re.I)})[filling_year-len_cells:]
             
-            cells = row.find_all('td',attrs={'class':re.compile('nump|num',re.I)})[filling_year+diff-len_cells:]
             sub_concept = row.find('td',attrs={'class':'pl'})
+
             m = sub_concept.find('strong') if sub_concept else True
-                    
+
             if not m and cells:
-                
+
                     for invalid_index in invalid_years_index:
                             cells.pop(invalid_index)
 
-                    concept = row.find('td',attrs={'class':'pl'}).getText()    
+                    concept = row.find('td',attrs={'class':'pl'}).getText()
+
 
                     for index,cell in enumerate(cells):
-
+                        
                         year_key = valid_years[index]
-                        if int(year_key) not in valid_years_list:
-                            continue
 
                         cell_class = cell.get('class')[0]
+
                         non_digit_filter = re.sub('\D','',cell.getText())
 
                         if cell_class == 'num':
                             non_digit_filter = f'({non_digit_filter})'
 
                         try:
-                            filling_dict[year_key][concept_title][concept] = non_digit_filter
+                            alternative_dict[year_key][type][concept_title][concept] = non_digit_filter
+
                         except:
-                            filling_dict[year_key][concept_title] = {concept:non_digit_filter}
-                    
+                            alternative_dict[year_key][type][concept_title] = {concept: non_digit_filter}
+
             else:
                     try:
                         concept_title = row.find('td',attrs={'class':'pl'}).getText()
@@ -215,11 +210,9 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
                         continue        
 
 
-    def get_statements(ticker,start_date,end_date,valid_years_list):
+    def get_statements(ticker,start_date,end_date,valid_years_list_global):
 
-        statements = {'Balance':{},'Cash':{},'Income':{}}
-
-        if not valid_years_list:
+        if not valid_years_list_global:
             return False
 
         fillings = get_10_k_links(ticker,start_date,end_date)
@@ -228,7 +221,7 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
             filling = filling_dict['url']
             filling_date = filling_dict['date']['regrex_expression']
             filling_year = filling_dict['date']['filling_year']
-        
+
             filling_summary = filling+'/FilingSummary.xml'
 
             req = requests.get(filling_summary,headers=header_req)
@@ -244,25 +237,29 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
                 file_url = filling+f'/{html_file_name}'
                 if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
                     if not income_state:
-                        parse_statement(True,file_url,filling_date,filling_year,statements['Income'],start_date,True,valid_years_list= valid_years_list)
+
+                        print(file_url,alternative_dict)
+                        parse_statement('Income',True,file_url,filling_date,filling_year,start_date,True,valid_years_list= valid_years_list_global)
                         income_state = True
 
                 if "BALANCE" in report_name and "SHEET" in report_name:
                     if not balance_state:
-                        parse_statement(False,file_url,filling_date,filling_year,statements['Balance'],start_date,valid_years_list= valid_years_list)
+                        print(file_url,alternative_dict)
+
+                        parse_statement('Balance',False,file_url,filling_date,filling_year,start_date,valid_years_list= valid_years_list_global)
                         balance_state = True
 
                 if "CASH FLOW" in report_name:
                     if not flow_state:
-                        parse_statement(True,file_url,filling_date,filling_year,statements['Cash'],start_date, valid_years_list= valid_years_list)
+                        print(file_url,alternative_dict)
+                        parse_statement('Cash',True,file_url,filling_date,filling_year,start_date, valid_years_list= valid_years_list_global)
                         flow_state = True
-                    
-        statements_structure['Balance'].update(statements['Balance'])
-        statements_structure['Income'].update(statements['Income'])
-        statements_structure['Cash'].update(statements['Cash'])
 
-        return statements
+        for year in alternative_dict:
+            statements_structure[year] = alternative_dict[year]
 
+        return alternative_dict
+        
 
     def create_excel(statements):
 
