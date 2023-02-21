@@ -78,9 +78,11 @@ def check_years(date_start,date_end):
                         year_to_check.append(year)
 
                     else:
-                        statements_structure[year] = {'Income' : attributes[year]['Income']}
-                        statements_structure[year] = {'Balance' : attributes[year]['Balance']}
-                        statements_structure[year] = {'Cash' : attributes[year]['Cash']}
+                        statements_structure2[year] = {}
+                        
+                        statements_structure2[year]['Income'] = json.loads( attributes[year]['Income'])
+                        statements_structure2[year]['Balance'] = json.loads( attributes[year]['Balance'])
+                        statements_structure2[year]['Cash'] = json.loads(attributes[year]['Cash'])
 
                 return year_to_check
 
@@ -261,54 +263,6 @@ def check_years(date_start,date_end):
         return alternative_dict
         
 
-    def create_excel(statements):
-
-        wb = Workbook()
-        sheet = wb.worksheets[0]
-
-        row_index=3
-
-
-        for statement in statements:
-
-            column_index = 1
-            if statement == 'Balance':
-                column_index = 6
-            if statement == 'Cash':
-                column_index = 12
-
-            sheet.cell(row=1,column=column_index ,value=statement)
-
-            #len_row = len(statements[statement])
-
-            for year in statements[statement]:
-                sheet.cell(row=row_index,column=column_index+1,value=year)
-
-                for concept_title in statements[statement][year]:
-
-                    sheet.cell(row=row_index+1,column=column_index+1,value=concept_title)
-                    concepts = statements[statement][year][concept_title]
-                    row_index+=1
-
-                    for concept in concepts:
-                        value = concepts[concept]
-                        sheet.cell(row=row_index+1,column=column_index+2,value=concept)
-                        sheet.cell(row=row_index+1,column=column_index+3,value=value)
-                        row_index+=1
-
-                    else:
-                        row_index+=2
-                
-                row_index+=4
-
-
-            else:
-                row_index = 3
-
-
-        return wb
-
-
    def insert_table(resuslts):
         statements_results = resuslts
 
@@ -354,14 +308,8 @@ def check_years(date_start,date_end):
 
     results = get_statements(ticker,start_date,end_date,check_years(start_date,end_date))
 
-    if results:
-        excel = create_excel(results)
-        with NamedTemporaryFile() as tmp:
-                file_path = tmp.name
-                excel.save(file_path)
-                stream = tmp.read()
-                return FileResponse(file_path,filename=f'{ticker}.xlsx')
-
+    if result:
+        insert_table(alternative_dict)
 
     return json.dumps(statements_structure)
 
