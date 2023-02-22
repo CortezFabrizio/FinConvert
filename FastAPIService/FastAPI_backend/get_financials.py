@@ -130,6 +130,8 @@ def check_years(date_start,date_end):
         content = BeautifulSoup(req,features="html.parser")
         rows_list = content.find('table',{"class": "report"}).find_all('tr')
 
+        currency_desc = rows_list[0].find('th',attrs={'class':'tl'}).getText()
+     
         if non_balance:
             row_years_index = 1
             rows__first_index_concepts = 2
@@ -161,10 +163,10 @@ def check_years(date_start,date_end):
 
                     valid_years.append(current_year)
                     if current_year in alternative_dict:
-                        alternative_dict[current_year][type] = {}
+                        alternative_dict[current_year][type] = {'title':currency_desc}
                         continue
                     else:
-                        alternative_dict[current_year] = {type:{}}
+                        alternative_dict[current_year] = {type:{'title':currency_desc}}
 
                 break   
 
