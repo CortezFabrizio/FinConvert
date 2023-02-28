@@ -265,53 +265,29 @@ def check_years(date_start,date_end):
         return alternative_dict
         
 
-   def insert_table(resuslts):
-        statements_results = resuslts
-
-        update_expression = ''
-        update_values = {}
-        update_names = {}
-
-        for year in statements_results:
-
-            for statement in statements_results[year]:
-
-                sheet = json.dumps(statements_results[year][statement])
-
-                attr_value = f':{year}{statement}'
-
-                if f'#{year}' not in update_names:
-                    update_names[f'#{year}'] = year
-
-                if update_expression:
-                    update_expression += f', #{year}.{statement} = {attr_value}'
-                    update_values[attr_value] = sheet
-
-                else:
-                    update_expression += f'SET #{year}.{statement} = {attr_value}'
-                    update_values[attr_value] = sheet
-
-
-
-        table = boto3.resource('dynamodb').Table('fabri_app')
-
-        response = table.update_item(
-            Key={
-                'ticker': ticker
-            },
-            UpdateExpression=update_expression,
-
-            ExpressionAttributeNames=update_names,
-
-            ExpressionAttributeValues=
-                update_values,
-        )
+  
 
 
     results = get_statements(ticker,start_date,end_date,check_years(start_date,end_date))
 
     if result:
-        insert_table(alternative_dict)
+        sqs = boto3.client('sqs')
+
+        message = json.dumps(alternative_dict)
+
+        sqs_attribute = {
+                'ticker': {
+                    'DataType': 'String',
+                    'StringValue': ticker
+                }
+        }
+
+
+        sqs.send_message(
+            QueueUrl='https://sqs.us-west-2.amazonaws.com/847350992021/TickerQueue',
+            MessageBody=message,
+            MessageAttributes=sqs_attribute
+        )
 
     return json.dumps(statements_structure)
 
