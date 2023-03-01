@@ -1,7 +1,6 @@
 
 import './App.css';
 import React, { useState } from 'react';
-import  ReactDOM  from 'react-dom/client';
 
 
 function App() {
@@ -10,30 +9,23 @@ function App() {
 
   return (
     <div id="searcher" className="App">
-      <p>Hola Mundo</p>
+      <p>Hello World</p>
 
       <input id='ticker' type="text"></input>
       <input id='end_date' type="text"></input>
       <input id='start_date' type="text"></input>
 
-      <input type="button" value="Search" onClick={ 
+      <input type="button" value="Search" onClick={
 
         async () => { 
           const finanicals = await get_financials();
-          setFin_data(finanicals)
+          setFin_data(finanicals);
         }
       } > 
       </input>
-
-      {fin_data
-      ?
-      <div id='results'>
-          {fin_data}
-      </div>
-      : 
-        <p></p>
-      }
-
+ 
+      {fin_data && <div id='results'> { fin_data } </div> }
+      
     </div>
   );
 }
@@ -70,49 +62,120 @@ async function get_financials() {
     );
 
 
-   const financial_tables = Object.keys(req).map( (year) =>
-      {
+  const years = Object.keys(req);
 
+  const financialTables = (
+    <div className="accordion">
+      {years.map((year) => {
         const statements = req[year];
-        return ( Object.keys(statements).map((sheet)=>{
-          const statement = statements[sheet]
+        return (
+          <div key={year} className="accordion-item">
+            <h2 className="accordion-header" id={`panel${year}`}>
+              <button
+                className="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target={`#collapse${year}`}
+                aria-expanded="false"
+                aria-controls={`collapse${year}`}
+              >
+                {year}
+              </button>
+            </h2>
 
-          return(
-            <table style={{border: "1px solid black"}}>
-                <tbody>
-                  <tr>{statement['title']}</tr>
-                      {delete statement['title']}
-                      {Object.keys(statement).map(
-                        (concept_title)=>{
-                            
-                            const concepts = statement[concept_title];
-                            const rows = [<tr><td>{concept_title}</td></tr>]
-                            const concept_keys = Object.keys(concepts)
+            <div
+              id={`collapse${year}`}
+              className="accordion-collapse collapse"
+              aria-labelledby={`panel${year}`}
+            >
+              <div className="accordion-body">
+                <div className="accordion">
+                  {Object.keys(statements).map((sheet) => {
+                    const statement = statements[sheet];
 
-                            concept_keys.forEach((keyy)=>{
-                              
-                              const value_concept = concepts[keyy];
+                    return (
+                      <div key={sheet} className="accordion-item">
+                        <h2
+                          className="accordion-header"
+                          id={`panel${year}${sheet}`}
+                        >
+                          <button
+                            className="accordion-button collapsed"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target={`#collapse${year}${sheet}`}
+                            aria-expanded="false"
+                            aria-controls={`collapse${year}${sheet}`}
+                          >
+                            {sheet}
+                          </button>
+                        </h2>
 
-                              rows.push(<tr><td>{keyy}</td><td>{value_concept}</td></tr>)                        
-                            })
-                            return rows                                  
-                        }
-                       )                                                               
-                      }
+                        <div
+                          id={`collapse${year}${sheet}`}
+                          className="accordion-collapse collapse"
+                          aria-labelledby={`panel${year}${sheet}`}
+                        >
+                          <div className="accordion-body">
+                            <table className="table table-bordered table-hover w-100 h-25">
+                              <thead>
+                                <tr>
+                                  <th colSpan="2" scope="col">
+                                    {statement["title"]}
+                                  </th>
+                                </tr>
+                                {delete statement["title"]}
+                              </thead>
+                              <tbody>
+                                {Object.keys(statement).map((conceptTitle) => {
+                                  if (conceptTitle === "title") {
+                                    return null;
+                                  }
 
-                </tbody>
+                                  const concepts = statement[conceptTitle];
+                                  const rows = [
+                                    <tr key={conceptTitle}>
+                                      <td align="left">
+                                        <b>{conceptTitle}</b>
+                                      </td>
+                                      <td></td>
+                                    </tr>,
+                                  ];
+                                  const conceptKeys = Object.keys(concepts);
 
-            </table>
-          )
+                                  conceptKeys.forEach((keyy) => {
+                                    const valueConcept = concepts[keyy];
 
-        }))
+                                    rows.push(
+                                      <tr key={keyy}>
+                                        <td className="w-25" align="left">
+                                          {keyy}
+                                        </td>
+                                        <td>{valueConcept}</td>
+                                      </tr>
+                                    );
+                                  });
+                                  return rows;
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 
-      }
-
-   )
-     
-   return (financial_tables)
+   return (financialTables)
 
     };
+
 
 export default App;
