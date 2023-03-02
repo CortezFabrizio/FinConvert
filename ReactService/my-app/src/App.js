@@ -62,114 +62,71 @@ async function get_financials() {
     );
 
 
-  const years = Object.keys(req);
+  function renderStatementRows(statement) {
+    const rows = [];
+  
+    Object.keys(statement).forEach((conceptTitle, index) => {
+      if (conceptTitle === 'title') {
+        return;
+      }
+  
+      const concepts = statement[conceptTitle];
+      rows.push(<tr key={`statement-${index}-row1`}><td align='left'><b>{conceptTitle}</b></td><td></td></tr>);
+  
+      Object.keys(concepts).forEach((key, subIndex) => {
+        const value = concepts[key];
+        rows.push(<tr key={`statement-${index}-row2-${subIndex}`}><td className='w-25' align='left'>{key}</td><td>{value}</td></tr>);
+      });
+    });
+  
+    return rows;
+  }
+  
+  function renderStatement(statementValues, year, sheet) {
+    return (
+      <div className="accordion-item" key={`${year}-${sheet}`}>
+        <h2 className="accordion-header" id={`panel${year}${sheet}`}>
+          <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target={`#collapse${year}${sheet}`} aria-expanded="false" aria-controls={`collapse${year}${sheet}`}>
+            {statementValues['title']}
+          </button>
+        </h2>
+        <div id={`collapse${year}${sheet}`} className="accordion-collapse collapse" aria-labelledby={`panel${year}${sheet}`}>
+          <div className="accordion-body">
+            <table className='table table-bordered table-hover w-100 h-25'>
 
-  const financialTables = (
-    <div className="accordion">
-      {years.map((year) => {
-        const statements = req[year];
-        return (
-          <div key={year} className="accordion-item">
-            <h2 className="accordion-header" id={`panel${year}`}>
-              <button
-                className="accordion-button collapsed"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target={`#collapse${year}`}
-                aria-expanded="false"
-                aria-controls={`collapse${year}`}
-              >
-                {year}
-              </button>
-            </h2>
-
-            <div
-              id={`collapse${year}`}
-              className="accordion-collapse collapse"
-              aria-labelledby={`panel${year}`}
-            >
-              <div className="accordion-body">
-                <div className="accordion">
-                  {Object.keys(statements).map((sheet) => {
-                    const statement = statements[sheet];
-
-                    return (
-                      <div key={sheet} className="accordion-item">
-                        <h2
-                          className="accordion-header"
-                          id={`panel${year}${sheet}`}
-                        >
-                          <button
-                            className="accordion-button collapsed"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target={`#collapse${year}${sheet}`}
-                            aria-expanded="false"
-                            aria-controls={`collapse${year}${sheet}`}
-                          >
-                            {sheet}
-                          </button>
-                        </h2>
-
-                        <div
-                          id={`collapse${year}${sheet}`}
-                          className="accordion-collapse collapse"
-                          aria-labelledby={`panel${year}${sheet}`}
-                        >
-                          <div className="accordion-body">
-                            <table className="table table-bordered table-hover w-100 h-25">
-                              <thead>
-                                <tr>
-                                  <th colSpan="2" scope="col">
-                                    {statement["title"]}
-                                  </th>
-                                </tr>
-                                {delete statement["title"]}
-                              </thead>
-                              <tbody>
-                                {Object.keys(statement).map((conceptTitle) => {
-                                  if (conceptTitle === "title") {
-                                    return null;
-                                  }
-
-                                  const concepts = statement[conceptTitle];
-                                  const rows = [
-                                    <tr key={conceptTitle}>
-                                      <td align="left">
-                                        <b>{conceptTitle}</b>
-                                      </td>
-                                      <td></td>
-                                    </tr>,
-                                  ];
-                                  const conceptKeys = Object.keys(concepts);
-
-                                  conceptKeys.forEach((keyy) => {
-                                    const valueConcept = concepts[keyy];
-
-                                    rows.push(
-                                      <tr key={keyy}>
-                                        <td className="w-25" align="left">
-                                          {keyy}
-                                        </td>
-                                        <td>{valueConcept}</td>
-                                      </tr>
-                                    );
-                                  });
-                                  return rows;
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <tbody>
+                {renderStatementRows(statementValues)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  function renderYear(year, req) {
+    const statements = req[year];
+    return (
+      <div className="accordion-item" key={year}>
+        <h2 className="accordion-header" id={`panel${year}`}>
+          <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target={`#collapse${year}`} aria-expanded="false" aria-controls={`collapse${year}`}>
+            {year}
+          </button>
+        </h2>
+        <div id={`collapse${year}`} className="accordion-collapse collapse" aria-labelledby={`panel${year}`}>
+          <div className="accordion-body">
+            <div className='accordion'>
+              {Object.keys(statements).map((sheet) => renderStatement(statements[sheet], year, sheet))}
             </div>
           </div>
-        );
-      })}
+        </div>
+      </div>
+    );
+  }
+  
+  const financialTables = (
+    <div className='accordion'>
+      {Object.keys(req).map((year) => renderYear(year, req))}
     </div>
   );
 
