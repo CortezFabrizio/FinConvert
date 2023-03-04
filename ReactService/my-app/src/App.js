@@ -1,4 +1,5 @@
 
+
 import './App.css';
 import React, { useState } from 'react';
 
@@ -6,38 +7,64 @@ import React, { useState } from 'react';
 function App() {
 
   const [fin_data,setFin_data] = useState(null);
+  const [ticker_value,setTicker] = useState(null);
+  const [start_date,setStart] = useState(null);
+  const [end_date,setEnd] = useState(null);
 
   return (
     <div id="searcher" className="App">
-      <p>Hello World</p>
 
-      <input id='ticker' type="text"></input>
-      <input id='end_date' type="text"></input>
-      <input id='start_date' type="text"></input>
+      <label>
+        Ticker Symbol
+          <input id='ticker' type="text"></input>
+      </label>
+
+      <label>
+        Starting year
+        <input id='start_date' type="text"></input>
+      </label>
+
+      <label> 
+       Ending year
+        <input id='end_date' type="text"></input>
+      </label>
 
       <input type="button" value="Search" onClick={
 
-        async () => { 
-          const finanicals = await get_financials();
+        async () => {
+          const ticker_value = document.getElementById("ticker").value;
+          setTicker(ticker_value)
+          const start_date = document.getElementById("start_date").value;
+          setStart(start_date)
+          const end_date = document.getElementById("end_date").value;
+          setEnd(end_date)
+
+
+          const finanicals = await get_financials(ticker_value,start_date,end_date);
           setFin_data(finanicals);
         }
+
       } > 
       </input>
- 
-      {fin_data && <div id='results'> { fin_data } </div> }
+
+      {fin_data &&
+      
+        <div id='results'>
+
+            <button type="button" className="btn btn-success"> <a className="link-light" href={'http:/FutureExternalIpHere/create-excel?ticker='+ticker_value+'&start_date='+start_date+'&end_date='+end_date }>Download Excel</a> </button>
+      
+            { fin_data }
+        </div> 
+      }
       
     </div>
   );
 }
 
 
-async function get_financials() {
+async function get_financials(ticker_value,start_date,end_date) {
 
-  const ticker_value = document.getElementById("ticker").value;
-  const start_date = document.getElementById("end_date").value;
-  const end_date = document.getElementById("start_date").value;
-
-  const url = new URL ('http://0.0.0.0:80/get-ticker')
+  const url = new URL ('http://FutureExternalIpHere/get-ticker')
   
   const params = {'ticker':ticker_value,'start_date':start_date,'end_date':end_date}
   url.search = new URLSearchParams(params).toString();
@@ -60,6 +87,7 @@ async function get_financials() {
     }
 
     );
+
 
 
   function renderStatementRows(statement) {
@@ -123,10 +151,10 @@ async function get_financials() {
       </div>
     );
   }
-  
+
   const financialTables = (
     <div className='accordion'>
-      {Object.keys(req).map((year) => renderYear(year, req))}
+      { Object.keys(req).map((year) => renderYear(year, req))}
     </div>
   );
 
