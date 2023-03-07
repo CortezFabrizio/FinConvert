@@ -1,5 +1,7 @@
-from fastapi import FastAPI,Response
+from fastapi import FastAPI,Response,HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
+
 
 import json
 import boto3
@@ -13,6 +15,27 @@ from tempfile import NamedTemporaryFile
 
 
 app = FastAPI()
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    list_errors = exc.errors()
+
+    error_response = {}
+
+    for desc_error in list_errors:
+        parameter = desc_error['loc'][1]
+        error_type = desc_error['type']
+
+        if error_type == 'value_error.missing':
+            error_response[parameter] = 'value is missing'
+
+        elif error_type == 'type_error.integer':
+            error_response[parameter] = 'value must be a integer'
+
+        elif error_type == 'type_error.string':
+            error_response[parameter] = 'value must be a string'
+
+    return JSONResponse(error_response,status_code=400)
 
 
 @app.get("/get-ticker")
@@ -41,12 +64,22 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
             payload_d = json.dumps({"keysTyped":ticker})
 
             req_index = requests.post(url=sec_search_endpoint,data=payload_d,headers=header_req)
-            first_result = req_index.json()["hits"]["hits"][0]
-            if ticker in first_result['_source']['tickers']:
+            try:
+                first_result = req_index.json()["hits"]["hits"][0]
+                if ticker in first_result['_source']['tickers']:
 
-                cik_without_0 = first_result['_id']
-                cik = '0'*(10-len(cik_without_0))+cik_without_0
-                return cik
+                    cik_without_0 = first_result['_id']
+                    cik = '0'*(10-len(cik_without_0))+cik_without_0
+
+                    return cik
+
+                else:
+                    raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist") 
+
+
+             except:
+                raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist") 
+
 
 
 def check_years(date_start,date_end):
@@ -119,7 +152,10 @@ def check_years(date_start,date_end):
 
         list_adsh = [{'date':date_validation(filling['_source']['period_ending']),'url':f'https://www.sec.gov/Archives/edgar/data/{cik}/'+filling['_source']['adsh'].replace('-','')} for filling in list_fillings if filling['_source']['file_type'] == '10-K' and int(filling['_source']['period_ending'].split('-')[0]) <= end_date and int(filling['_source']['period_ending'].split('-')[0]) >= start_date ]
 
-        return list_adsh
+       if list_adsh:
+            return list_adsh
+        else:
+            raise HTTPException(status_code=400,detail="Ticker doesn't represent a US companie")
 
 
 
