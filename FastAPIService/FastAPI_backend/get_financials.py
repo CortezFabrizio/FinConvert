@@ -82,7 +82,7 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
 
 
 
-def check_years(date_start,date_end):
+    def check_years(date_start,date_end):
 
         years_difference = date_end-date_start
 
@@ -93,7 +93,6 @@ def check_years(date_start,date_end):
 
             table = boto3.resource('dynamodb').Table('fabri_app')
 
-
             response_item = table.get_item(
             Key={
                 'ticker':ticker
@@ -103,30 +102,40 @@ def check_years(date_start,date_end):
             if 'Item' in response_item:
                 year_to_check = []
 
-                attributes = response_item['Item']
+                dates_attr = response_item['Item']
+
+                attributes = {}
+
+                for date in dates_attr:
+                    year = date.split('-')[0]
+                    if year in attributes:
+                        attributes[year].append(date)
+                    else:
+                        attributes[year] = [date]
 
                 for year in years_to_get:
-                    if year not in attributes:
 
+                    if year not in attributes:
+                
                         year_to_check.append(year)
 
                     else:
-                        statements_structure2[year] = {}
-                        
-                        statements_structure2[year]['Income'] = json.loads( attributes[year]['Income'])
-                        statements_structure2[year]['Balance'] = json.loads( attributes[year]['Balance'])
-                        statements_structure2[year]['Cash'] = json.loads(attributes[year]['Cash'])
+
+                        dates = attributes[year]
+
+                        for date in dates:
+
+                            statements_structure2[date] = {}
+                            
+                            statements_structure2[date]['Income'] = json.loads( dates_attr[date]['Income'])
+                            statements_structure2[date]['Balance'] = json.loads( dates_attr[date]['Balance'])
+                            statements_structure2[date]['Cash'] = json.loads(dates_attr[date]['Cash'])
 
                 return year_to_check
 
             else:
-                item_dict = {'ticker':ticker}
-                for year in years_to_get:
-                    item_dict[year] = {}
-
-
                 table.put_item(
-                    Item=item_dict
+                    Item={'ticker':ticker}
                 )
 
                 return years_to_get
@@ -157,6 +166,26 @@ def check_years(date_start,date_end):
         else:
             raise HTTPException(status_code=400,detail="Ticker doesn't represent a US companie")
 
+            
+            
+    dates_statements_added = {}
+
+    regex_date = re.compile(r"[A-Za-z][A-Za-z][A-Za-z]\. \d\d, \d\d\d\d")
+    regex_year = re.compile(r"\d\d\d\d")
+    regex_day = re.compile(r"\d\d,")
+    regex_month = re.compile(r"[A-Za-z][A-Za-z][A-Za-z]", re.IGNORECASE)
+
+    number_month_dict = {'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+                        'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'}
+
+
+    def valid_format_date(input_date):
+        date = regex_date.findall(input_date)[0]
+        year = regex_year.findall(date)[0]
+        day = regex_day.findall(date)[0][0:2]
+        month = number_month_dict[regex_month.findall(date)[0].lower()]
+        date_result = f'{year}-{month}-{day}'
+        return date_result,year
 
 
    def parse_statement(type,non_balance,file_url,date,year_filling,end_date,is_income = False,valid_years_list=False):
@@ -167,7 +196,7 @@ def check_years(date_start,date_end):
         rows_list = content.find('table',{"class": "report"}).find_all('tr')
 
         currency_desc = rows_list[0].find('th',attrs={'class':'tl'}).getText()
-     
+
         if non_balance:
             row_years_index = 1
             rows__first_index_concepts = 2
@@ -181,28 +210,49 @@ def check_years(date_start,date_end):
 
         row_years = rows_list[row_years_index].find_all('th',attrs={'class':'th'})
 
-        years = [year_row for year_row in row_years if re.findall("Jan.*\d{4}|Feb.*\d{4}|Mar.*\d{4}|Apr.*\d{4}|May.*\d{4}|Jun.*\d{4}|Jul.*\d{4}|Aug.*\d{4}|Sep.*\d{4}|Oct.*\d{4}|Nov.*\d{4}|Dec.*\d{4}", year_row.getText())]
+        years = [ regex_date.findall(year_row.getText())[0] for year_row in row_years if regex_date.findall(year_row.getText())]
 
         for index,year in enumerate(reversed(years)):
-            if re.search(f'{date}',year.text,re.I):
+            if re.search(f'{date}',year,re.I):
+
 
                 filling_year = len(years)-(index+1)
 
                 valid_years = []
                 invalid_years_index = []
-                for index_year in range(0,len(years[filling_year:])):
 
-                    current_year = str(int(year_filling)-index_year)
-                    if current_year not in valid_years_list or int(current_year) < end_date:
+                fillings_years = years[filling_year:]
+
+                for index_year in range(0,len(fillings_years)):
+
+                    current_date = fillings_years[index_year]
+
+                    if current_date in dates_statements_added:
+                        if type not in dates_statements_added[current_date]:
+                            dates_statements_added[current_date].append(type)
+
+                        else:
+                            invalid_years_index.insert(0,index_year)
+                            continue
+
+                    else:
+                        dates_statements_added[current_date] = [type]
+
+                    date_formated = valid_format_date(current_date)
+                    valid_date = date_formated[0]
+                    current_year = date_formated[1]
+
+
+                    if current_year not in valid_years_list or int(current_year) < end_date :
                         invalid_years_index.insert(0,index_year)
                         continue
 
-                    valid_years.append(current_year)
-                    if current_year in alternative_dict:
-                        alternative_dict[current_year][type] = {'title':currency_desc}
+                    valid_years.append(valid_date)
+                    if valid_date in alternative_dict:
+                        alternative_dict[valid_date][type] = {'title':currency_desc}
                         continue
                     else:
-                        alternative_dict[current_year] = {type:{'title':currency_desc}}
+                        alternative_dict[valid_date] = {type:{'title':currency_desc}}
 
                 break   
 
