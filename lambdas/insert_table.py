@@ -20,31 +20,34 @@ def insert_table(event,context):
 
     for year in statements_results:
 
-        if update_expression_years:
-            update_expression_years+= f', #{year} = {def_value_year}'
-        else:
-            update_expression_years+= f'SET #{year} = {def_value_year}'
+        year_update_value = year
 
-        statements = statements_results[year]
+        year_update_key = year.replace('-','')
+
+        if update_expression_years:
+            update_expression_years+= f', #{year_update_key} = {def_value_year}'
+        else:
+            update_expression_years+= f'SET #{year_update_key} = {def_value_year}'
+
+        statements = statements_results[year_update_value]
 
         for statement in statements:                    
 
             sheet = json.dumps(statements[statement])
 
-            attr_value = f':{year}{statement}'
+            attr_value = f':{year_update_key}{statement}'
 
-            if f'#{year}' not in update_names:
-                update_names[f'#{year}'] = year
+            if f'#{year_update_key}' not in update_names:
+                update_names[f'#{year_update_key}'] = year_update_value
 
 
             if update_expression:
-                update_expression += f', #{year}.{statement} = {attr_value}'
+                update_expression += f', #{year_update_key}.{statement} = {attr_value}'
                 update_values[attr_value] = sheet
 
             else:
-                update_expression += f'SET #{year}.{statement} = {attr_value}'
+                update_expression += f'SET #{year_update_key}.{statement} = {attr_value}'
                 update_values[attr_value] = sheet
-
 
     table.update_item(
         Key={
@@ -70,4 +73,3 @@ def insert_table(event,context):
         ExpressionAttributeValues=
             update_values,
     )
-
