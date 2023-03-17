@@ -1,5 +1,3 @@
-
-
 import './App.css';
 import React, { useState } from 'react';
 
@@ -10,23 +8,23 @@ function App() {
   const [ticker_value,setTicker] = useState(null);
   const [start_date,setStart] = useState(null);
   const [end_date,setEnd] = useState(null);
+  const [validation_error,setError] = useState(null);
+
 
   return (
     <div id="searcher" className="App">
 
       <label>
         Ticker Symbol
-          <input id='ticker' type="text"></input>
+      <input id='ticker' type="text"></input>
       </label>
 
-      <label>
-        Starting year
-        <input id='start_date' type="text"></input>
+      <label>Starting year
+      <input id='start_date' type="text"></input>
       </label>
 
-      <label> 
-       Ending year
-        <input id='end_date' type="text"></input>
+      <label> Ending year
+      <input id='end_date' type="text"></input>
       </label>
 
       <input type="button" value="Search" onClick={
@@ -41,7 +39,13 @@ function App() {
 
 
           const finanicals = await get_financials(ticker_value,start_date,end_date);
-          setFin_data(finanicals);
+
+          if (!(finanicals[0])){
+            setError(finanicals[1])
+          }
+          else{
+          setFin_data(finanicals[1]);
+          }
         }
 
       } > 
@@ -51,11 +55,20 @@ function App() {
       
         <div id='results'>
 
-            <button type="button" className="btn btn-success"> <a className="link-light" href={'http:/FutureExternalIpHere/create-excel?ticker='+ticker_value+'&start_date='+start_date+'&end_date='+end_date }>Download Excel</a> </button>
+            <button type="button" className="btn btn-success"> <a className="link-light" href={'http://127.0.0.1:8000/create-excel?ticker='+ticker_value+'&start_date='+start_date+'&end_date='+end_date }>Download Excel</a> </button>
       
             { fin_data }
         </div> 
       }
+
+      {validation_error &&
+      
+      <div id='errors'>    
+        <ul>
+          { validation_error }
+        </ul>
+      </div> 
+      }   
       
     </div>
   );
@@ -64,7 +77,7 @@ function App() {
 
 async function get_financials(ticker_value,start_date,end_date) {
 
-  const url = new URL ('http://FutureExternalIpHere/get-ticker')
+  const url = new URL ('http://127.0.0.1:8000/get-ticker')
   
   const params = {'ticker':ticker_value,'start_date':start_date,'end_date':end_date}
   url.search = new URLSearchParams(params).toString();
@@ -75,6 +88,10 @@ async function get_financials(ticker_value,start_date,end_date) {
   };
 
    const req = await fetch(url,info).then((response) => {
+    if (!response.ok) {
+      return response.json().then(res => { throw Error(JSON.stringify(res)) });
+    }
+
     return response.json()
 
     })
@@ -86,7 +103,11 @@ async function get_financials(ticker_value,start_date,end_date) {
   
     }
 
-    );
+    ).catch(error => {
+
+      return error
+
+    });
 
 
 
@@ -109,7 +130,7 @@ async function get_financials(ticker_value,start_date,end_date) {
   
     return rows;
   }
-  
+
   function renderStatement(statementValues, year, sheet) {
     return (
       <div className="accordion-item" key={`${year}-${sheet}`}>
@@ -152,15 +173,28 @@ async function get_financials(ticker_value,start_date,end_date) {
     );
   }
 
-  const financialTables = (
-    <div className='accordion'>
-      { Object.keys(req).map((year) => renderYear(year, req))}
-    </div>
-  );
+  if ( !(req instanceof Error) ){
+    const financialTables = (
+      <div className='accordion'>
+        { Object.keys(req).map((year) => renderYear(year, req))}
+      </div>
+    );
 
-   return (financialTables)
+   return ([true,financialTables])
+  }
+  else{
+    const validation_errors = JSON.parse(req.message)
+    const error_message_user =  []
+    for (const error in validation_errors){
 
-    };
+      error_message_user.push(<li>{error}:{validation_errors[error]}</li>)
+
+    }
+
+    return [false,error_message_user]
+  }
+
+  };
 
 
 export default App;
