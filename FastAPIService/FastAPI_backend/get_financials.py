@@ -1,14 +1,12 @@
+import json
+import boto3
+import re
+import requests
+
 from fastapi import FastAPI,Response,HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 
-
-import json
-import boto3
-from pydantic import BaseModel
-import time
-import re
-import requests
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
 from tempfile import NamedTemporaryFile
@@ -39,11 +37,12 @@ async def validation_exception_handler(request, exc):
 
 
 @app.get("/get-ticker")
-def read_root(ticker:str,start_date:int,end_date:int,response:Response):
+def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
     response.headers['Access-Control-Allow-Origin'] = '*'
-
-    file_path = None
+    
+    if int(start_date) > int(end_date) or int(start_date) < 2013:
+        raise HTTPException(status_code=400,detail="The beginning year must be equal or less than the final year and greater than 2013",headers={'Access-Control-Allow-Origin':'*'}) 
 
     sec_search_endpoint = 'https://efts.sec.gov/LATEST/search-index'
 
@@ -74,11 +73,11 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
                     return cik
 
                 else:
-                    raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist") 
+                    raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist",headers={'Access-Control-Allow-Origin':'*'}) 
 
 
              except:
-                raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist") 
+                raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist",headers={'Access-Control-Allow-Origin':'*'}) 
 
 
 
@@ -164,7 +163,7 @@ def read_root(ticker:str,start_date:int,end_date:int,response:Response):
        if list_adsh:
             return list_adsh
         else:
-            raise HTTPException(status_code=400,detail="Ticker doesn't represent a US companie")
+            raise HTTPException(status_code=400,detail="Ticker doesn't represent a US companie",headers={'Access-Control-Allow-Origin':'*'})
 
             
             
