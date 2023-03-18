@@ -6,10 +6,24 @@ WORKDIR /fastAPI
 
 COPY ./FastAPI_backend /fastAPI/
 
-
 RUN pip install uvicorn
 RUN pip install fastapi
+RUN pip install requests
 RUN pip install boto3
+RUN pip install openpyxl
+RUN pip install beautifulsoup4
+RUN pip install lxml
+
+RUN apt-get update && \
+    apt-get -y install nginx
+
+COPY ./nginx/nginx.conf /etc/nginx/conf.d
+
+RUN rm /etc/nginx/sites-enabled/default
+RUN rm /etc/nginx/sites-available/default
 
 
-CMD ["uvicorn", "test:app", "--host", "0.0.0.0", "--port", "80"]
+EXPOSE 80
+
+CMD ["/bin/sh","-c","nginx -g 'daemon on;' && uvicorn get_financials:app --host 127.0.0.1 --port 8000"]
+
