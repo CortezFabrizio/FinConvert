@@ -1,0 +1,139 @@
+body {
+  background-color: #F0F8FF;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.title{
+  margin-right: 550px;
+}
+
+.titleTransition{
+  margin-top: 10px;
+  margin-right: 900px;
+  animation-name: titleAnimation;
+  animation-duration: 3s;
+
+}
+
+@keyframes titleAnimation {
+  from {
+    margin-right: 550px;
+  }
+
+  to {
+    margin-right: 800px;
+  }
+  
+}
+
+
+
+
+
+.rowsize{
+  width: 30px ;
+}
+
+.initialStyle{
+  margin-top: 5%;
+}
+
+
+.font{
+  color: #778899;
+  font-size: 90px;
+
+}
+
+.secondFont{
+  color: #778899;
+
+  font-size: 55px;
+  animation-name: slideFont;
+  animation-duration:3s;
+}
+
+@keyframes slideFont {
+  from {
+    font-size: 90px;
+  }
+
+  to {
+    font-size: 55px;
+  }
+  
+}
+
+.secondStyle{
+
+  margin-top: 1%;
+  animation-name: slidein;
+  animation-duration: 3s;
+}
+
+@keyframes slidein {
+  from {
+    margin-top: 5%;
+  }
+
+  to {
+    margin-top: 1%;
+  }
+}
+
+.navBack{
+  background-color: #B0E0E6;
+
+}
+
+.smallSZ{
+  font-size: 15px;
+}
+
+
+.logo{
+  height: 350px;
+  width: 350px;
+  padding: 20px;
+  margin: 20px;
+  margin-left: 200px;
+}
+
+
+.logoTransition{
+  height: 100px;
+  width: 100px;
+  margin-left: 20px;
+  animation-name: logoAnimation;
+  animation-duration: 3s;
+}
+
+@keyframes logoAnimation {
+  from {
+    height: 350px;
+    width: 350px;
+  }
+
+  to {
+    height: 100px;
+    width: 100px;
+  }
+}
+
+.git-logo{
+
+  height: 50px;
+  width: 50px;
+  margin-right: 200px;
+
+}
