@@ -5,6 +5,7 @@ SHELL ["/bin/bash", "-c"]
 WORKDIR /fastAPI
 
 COPY ./get_financials.py /fastAPI/
+COPY ./exception_handler_functions.py /fastAPI/
 
 RUN pip install uvicorn
 RUN pip install fastapi

@@ -1,3 +1,4 @@
+import json
 
 def error_validation_response(exc):
 
@@ -21,3 +22,14 @@ def error_validation_response(exc):
             error_response[parameter] = 'value must be a string'
     
     return error_response
+
+
+def verify_statement_existence(dates_list,date,statement_name):
+
+    try:
+        statement_values =  json.loads(dates_list[date][statement_name])
+
+        return statement_values
+
+    except:
+        return {'title':'Statement not available'}

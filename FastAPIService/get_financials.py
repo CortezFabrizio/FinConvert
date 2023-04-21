@@ -3,6 +3,7 @@ import os
 import boto3
 import re
 import requests
+import datetime
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
 
@@ -12,7 +13,7 @@ from fastapi import FastAPI,Response,HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import Response as file_response,JSONResponse
 
-from exception_handler_functions import error_validation_response
+from exception_handler_functions import error_validation_response,verify_statement_existence
 
 app = FastAPI()
 
@@ -21,9 +22,12 @@ app = FastAPI()
 async def validation_exception_handler(request, exc):
     return JSONResponse(error_validation_response(exc),status_code=400,headers={'Access-Control-Allow-Origin':'*'})
 
+current_year = datetime.date.today().year
 
 @app.get("/get-ticker")
 def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
+
+    ticker = ticker.strip(' ')
 
     response.headers['Access-Control-Allow-Origin'] = '*'
     cors_policy_error_400 = {'Access-Control-Allow-Origin':'*'}
@@ -33,8 +37,8 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
         raise HTTPException(status_code=400,detail="The beginning year must be equal or less than the final year and greater than 2013",headers=cors_policy_error_400) 
     
-    elif end_date > 2025:
-        end_date = 2025
+    elif end_date > current_year:
+        end_date = current_year+1
 
     sec_search_endpoint = 'https://efts.sec.gov/LATEST/search-index'
 
@@ -123,9 +127,9 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
                         for date in dates:
 
-                            income = json.loads(dates_attr[date]['Income'])
-                            balance = json.loads(dates_attr[date]['Balance'])
-                            cash = json.loads(dates_attr[date]['Cash'])
+                            income = verify_statement_existence(dates_attr,date,'Income')
+                            balance = verify_statement_existence(dates_attr,date,'Balance')
+                            cash = verify_statement_existence(dates_attr,date,'Cash')
 
                             year_position[date] = {'Income':income,'Balance':balance,'Cash':cash}
 
@@ -171,7 +175,7 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
             return (list_adsh)
 
         else:
-            raise HTTPException(status_code=400,detail="Ticker doesn't represent a US companie",headers=cors_policy_error_400)
+            raise HTTPException(status_code=400,detail="Ticker doesn't represent a US company",headers=cors_policy_error_400)
 
 
     new_financial_data = {}
@@ -266,6 +270,7 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
 
         concept_title = 'FirstBlock'
+        concept_titles_used = set({})
 
         for row in rows_list[rows__first_index_concepts:]:
 
@@ -279,7 +284,7 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
             is_concept_title = concept.find('strong') if concept else True
 
-            if not is_concept_title and cells:
+            if not is_concept_title and cells and concept_title:
 
                     for invalid_index in invalid_years_index:
                             cells.pop(invalid_index)
@@ -290,16 +295,18 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
                         valid_index = valid_years[index]
 
                         valid_date = valid_index[0]
+
                         valid_year = valid_index[1]
    
                         cell_class = cell.get('class')[0]
 
                         non_digit_filter = re.sub('\D','',cell.getText())
-                   
+
                         if cell_class == 'num':
                             non_digit_filter = f'({non_digit_filter})'
 
                         try:
+
                             new_financial_data[valid_date][type][concept_title][concept_text] = non_digit_filter
                             year_order[valid_year][valid_date][type][concept_title][concept_text] = non_digit_filter
 
@@ -312,6 +319,12 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
                 if is_concept_title:
                     try:
                         concept_title = concept.getText()
+
+                        if concept_title in concept_titles_used:
+                            concept_title = None
+                        else:
+                            concept_titles_used.add(concept_title)
+
                     except:
                         continue        
 
@@ -383,7 +396,7 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
         }
 
         sqs.send_message(
-            QueueUrl='https://sqs.us-west-2.amazonaws.com/847350992021/TickerQueue',
+            QueueUrl='https://sqs.us-west-2.amazonaws.com/870828436064/TickerQueue',
             MessageBody=message,
             MessageAttributes=sqs_attribute
         )
@@ -395,7 +408,6 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
 @app.get('/create-excel')
 def excel_creator(ticker:str,start_date:int,end_date:int):
-
 
         param = {'ticker':ticker,'start_date':start_date,'end_date':end_date}
         res = requests.get('http://127.0.0.1:8000/get-ticker',param)
