@@ -19,9 +19,9 @@ function Intro(props){
   if (props.initial === 'initialStyle'){
 
     return (
-        <div className="card" style={{width:'800px',marginLeft:'25%'}}>
+        <div className="card" style={{width:'45%',margin:'auto'}}>
           <div className="card-body">
-            <p>FinConvert will return Income,Balance and Cash flow statements,as a excel too, from 2013 to the present,where the ticker symbol represents a U.S based and publicly trading company  </p>
+            <p>FinConvert will return Income,Balance and Cash flow statements,as a excel too,from 2013 to the present,where the ticker symbol represents a U.S based and publicly trading company  </p>
         </div>
       </div>
       )
@@ -34,8 +34,8 @@ function RepoLogo(props){
   if (!(props.initial === 'initialStyle')){
   return (
   <a href='https://github.com/CortezFabrizio/FinSearch'>
-    <div className='git-logo'>
-        <img alth='git logo' src={git_logo} className='git-logo'></img>
+    <div style={{marginRight:'100px'}}>
+        <img alth='git logo' src={git_logo} className='github'></img>
     </div>
   </a>
   )
@@ -50,24 +50,23 @@ function App() {
   const [start_date,setStart] = useState(null);
   const [end_date,setEnd] = useState(null);
   const [validation_error,setError] = useState(null);
-  const [initial_style,setStyle] = useState(['initialStyle','logo','font','title'])
+  const [initial_style,setStyle] = useState(['initialStyle','logo','font','title','justify-content-center'])
 
   return (
     <div id="searcher" className={`App`}>
 
   <div className={`${initial_style[0]}`}>
 
-      <nav className={`navbar p-0 navBack`}>
+      <nav className={`navbar p-0 navBack ${initial_style[4]}`}>
 
         <a><img alt='image' className={initial_style[1]} src={logo}></img>
         </a>
-
+        
         <a className={initial_style[3]}><h2 className={`${initial_style[2]} mb-0`}>FinConvert</h2>
           <p className='smallSZ'>By: Fabrizio Cortez <br></br>fabriziocortezandres@gmail.com</p>
         </a>
 
         <RepoLogo initial={initial_style[0]}></RepoLogo>
-
 
       </nav>
 
@@ -110,7 +109,7 @@ function App() {
             setFin_data(null)
           }
           else{
-            setStyle(['secondStyle','logoTransition','secondFont','titleTransition'])
+            setStyle(['secondStyle','logoTransition','secondFont','titleTransition',null])
             setError(null)
             setFin_data(finanicals[1]);
           }
@@ -129,7 +128,7 @@ function App() {
       
         <div id='results' className='m-3'>
 
-            <button type="button" className="btn btn-success m-4"> <a className="link-light" href={'http://127.0.0.1:8000/create-excel?ticker='+ticker_value+'&start_date='+start_date+'&end_date='+end_date }>Download Excel</a> </button>
+            <button type="button" className="btn btn-success m-4"> <a className="link-light" href={'http://35.87.193.122/create-excel?ticker='+ticker_value+'&start_date='+start_date+'&end_date='+end_date }>Download Excel</a> </button>
       
             { fin_data }
         </div>
@@ -156,7 +155,7 @@ function App() {
 
 async function get_financials(ticker_value,start_date,end_date) {
 
-  const url = new URL ('http://127.0.0.1:8000/get-ticker')
+  const url = new URL ('http://35.87.193.122/get-ticker')
   
   const params = {'ticker':ticker_value,'start_date':start_date,'end_date':end_date}
   url.search = new URLSearchParams(params).toString();

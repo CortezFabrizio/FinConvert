@@ -14,12 +14,14 @@ code {
 }
 
 .title{
-  margin-right: 550px;
+  position: relative;
+
 }
 
 .titleTransition{
   margin-top: 10px;
-  margin-right: 900px;
+  position: absolute;
+  left:130px;
   animation-name: titleAnimation;
   animation-duration: 3s;
 
@@ -27,16 +29,16 @@ code {
 
 @keyframes titleAnimation {
   from {
-    margin-right: 550px;
+    left:400px;
+
   }
 
   to {
-    margin-right: 800px;
+    left: 130px;
+
   }
   
 }
-
-
 
 
 
@@ -57,8 +59,7 @@ code {
 
 .secondFont{
   color: #778899;
-
-  font-size: 55px;
+  font-size: 45px;
   animation-name: slideFont;
   animation-duration:3s;
 }
@@ -69,7 +70,7 @@ code {
   }
 
   to {
-    font-size: 55px;
+    font-size: 45px;
   }
   
 }
@@ -104,9 +105,8 @@ code {
 .logo{
   height: 350px;
   width: 350px;
-  padding: 20px;
-  margin: 20px;
-  margin-left: 200px;
+  margin: 15px;
+
 }
 
 
@@ -114,9 +114,11 @@ code {
   height: 100px;
   width: 100px;
   margin-left: 20px;
+  margin-right: 50%;
   animation-name: logoAnimation;
   animation-duration: 3s;
 }
+
 
 @keyframes logoAnimation {
   from {
@@ -130,10 +132,9 @@ code {
   }
 }
 
-.git-logo{
 
+.github{
   height: 50px;
   width: 50px;
-  margin-right: 200px;
-
 }
+
