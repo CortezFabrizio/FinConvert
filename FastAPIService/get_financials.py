@@ -4,6 +4,7 @@ import boto3
 import re
 import requests
 import datetime
+import time
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
 
@@ -24,10 +25,33 @@ async def validation_exception_handler(request, exc):
 
 current_year = datetime.date.today().year
 
+user_agent = os.getenv('USER_AGENT')
+
+header_req_index = {
+    "user-Agent":user_agent,
+    "accept-Encoding":"gzip, deflate, br",
+    "origin":"https://www.sec.gov",
+    "cache-control": "no-cache",
+    "referer":"https://www.sec.gov/",
+    "accept": "application/json, text/javascript, */*; q=0.01",
+    "pragma":"no-cache"
+    }
+
+sec_search_endpoint = 'https://efts.sec.gov/LATEST/search-index'
+
+header_req = {
+    "user-Agent":user_agent,
+    "accept-Encoding":"gzip, deflate, br",
+    "origin":"https://www.sec.gov",
+    "content-type":"application/x-www-form-urlencoded; charset=UTF-8",
+    "cache-control": "no-cache",
+    "referer":"https://www.sec.gov/"
+    }
+
 @app.get("/get-ticker")
 def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
-    ticker = ticker.strip(' ')
+    ticker = ticker.strip(' ').upper()
 
     response.headers['Access-Control-Allow-Origin'] = '*'
     cors_policy_error_400 = {'Access-Control-Allow-Origin':'*'}
@@ -40,40 +64,40 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
     elif end_date > current_year:
         end_date = current_year+1
 
-    sec_search_endpoint = 'https://efts.sec.gov/LATEST/search-index'
-
-    header_req = {
-    "user-Agent":os.getenv('USER_AGENT'),
-    "accept-Encoding":"gzip, deflate, br",
-    "origin":"https://www.sec.gov",
-    "content-type":"application/x-www-form-urlencoded; charset=UTF-8",
-    "cache-control": "no-cache",
-    "referer":"https://www.sec.gov/"
-    }
-
-
     statements_results = {}
 
+
     def search_cik(ticker):
+        paramm = {"keysTyped":ticker}
 
-            payload = json.dumps({"keysTyped":ticker})
+        req_index = requests.get(url=sec_search_endpoint,headers=header_req_index,params=paramm)
 
-            req_index = requests.post(url=sec_search_endpoint,data=payload,headers=header_req)
+        if req_index.status_code == 500:
+            for i in range(0,45):
+                time.sleep(0.5)
+                req_index_error = requests.get(url=sec_search_endpoint,headers=header_req_index,params=paramm)
 
-            try:
-                first_result = req_index.json()["hits"]["hits"][0]
-                if ticker in first_result['_source']['tickers']:
+                if req_index_error.status_code == 200:
 
-                    cik_without_0 = first_result['_id']
-                    cik = '0'*(10-len(cik_without_0))+cik_without_0
+                    req_index = req_index_error
+                    break
+            else:
+                raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist or try again with the exact symbol",headers=cors_policy_error_400) 
 
-                    return cik
 
-                else:
-                    raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist",headers=cors_policy_error_400) 
+        try:
+            first_result = req_index.json()["hits"]["hits"][0]
+            if ticker in first_result['_source']['tickers']:
 
-            except:
-                raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist",headers=cors_policy_error_400) 
+                cik_without_0 = first_result['_id']
+                cik = '0'*(10-len(cik_without_0))+cik_without_0
+                return cik
+
+            else:
+                raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist or try again with the exact symbol",headers=cors_policy_error_400) 
+        except:
+                raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist or try again with the exact symbol",headers=cors_policy_error_400) 
+                    
 
     year_order = {}
                 
