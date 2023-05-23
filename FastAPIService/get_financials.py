@@ -502,3 +502,26 @@ def excel_creator(ticker:str,start_date:int,end_date:int):
                 stream = tmp.read()
         
         return file_response(content=stream,media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+   
+
+@app.get("/search-name")
+def search_name(Typed:str,response:Response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+
+    keys_typed = Typed.strip(' ').upper()
+
+    req_search = requests.get(f'https://efts.sec.gov/LATEST/search-index?keysTyped={keys_typed}',headers=header_req_index)
+
+    if req_search.status_code == 200 :
+        results = req_search.json()['hits']['hits']
+        print(results)
+        list_results = [{'ticker':result['_source']['tickers'].split(',')[0],'name':result['_source']['entity']} for result in results if 'tickers' in result['_source']]
+
+        if list_results:
+            return json.dumps(list_results)
+        else:
+            return json.dumps([{'error':'No tickers found'}])
+    
+    else:
+
+        return json.dumps([{'error':'SEC endpoint could not process the request'}])
