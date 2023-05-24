@@ -48,6 +48,15 @@ header_req = {
     "referer":"https://www.sec.gov/"
     }
 
+regex_date = re.compile(r"[A-Za-z]{3}[.\s]*\d{1,2}[,\s]*\d{4}")
+regex_year = re.compile(r"\d\d\d\d")
+regex_day = re.compile(r"\d\d,")
+regex_month = re.compile(r"[A-Za-z][A-Za-z][A-Za-z]", re.IGNORECASE)
+regex_cell_number_class = re.compile('nump|num|text',re.I)
+regex_first_income_row_class = re.compile('nump|num',re.I)
+number_month_dict = {'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+                        'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'}
+
 @app.get("/get-ticker")
 def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
@@ -203,18 +212,6 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
 
     new_financial_data = {}
-
-    regex_date = re.compile(r"[A-Za-z][A-Za-z][A-Za-z]\. \d\d, \d\d\d\d")
-    regex_year = re.compile(r"\d\d\d\d")
-    regex_day = re.compile(r"\d\d,")
-    regex_month = re.compile(r"[A-Za-z][A-Za-z][A-Za-z]", re.IGNORECASE)
-
-    regex_cell_number_class = re.compile('nump|num|text',re.I)
-    regex_first_income_row_class = re.compile('nump|num',re.I)
-
-    number_month_dict = {'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
-                        'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'}
-
 
     def valid_format_date(input_date):
         date = regex_date.findall(input_date)[0]
