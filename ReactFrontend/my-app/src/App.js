@@ -1,14 +1,16 @@
 import './App.css';
-import React, { useState } from 'react';
+import React, { useState , useEffect } from 'react';
 import logo from './finconvert.png'
 import git_logo from './git_logo.png'
+import { DebounceInput } from 'react-debounce-input'
+
 
 function LoadingEffect(props){
   if (props.isLoading === false){
 
     return (
-    <div class="spinner-border text-success m-5" role="status">
-      <span class="sr-only">Loading...</span>
+    <div className="spinner-border text-success m-5" role="status">
+      <span className="sr-only">Loading...</span>
     </div>
     )
 
@@ -16,12 +18,13 @@ function LoadingEffect(props){
 }
 
 function Intro(props){
-  if (props.initial === 'initialStyle'){
+  if (props.initial === 'initialStyle' && !(props.err)){
 
     return (
-        <div className="card" style={{width:'45%',margin:'auto'}}>
+        <div className="card" style={{width:'70%',margin:'auto'}}>
           <div className="card-body">
-            <p>FinConvert will return Income,Balance and Cash flow statements,as a excel too,from 2013 to the present,where the ticker symbol represents a U.S based and publicly trading company  </p>
+            <p><span style={{color:'red'}}>English</span>: FinConvert will return Income,Balance and Cash flow statements,as a excel too,from 2013 to the present,where the company name or ticker symbol represents a U.S based and publicly trading company(each company has a unique one assigned by the SEC). <span style={{color:'red'}}>Usage example with the company Amazon.com,Inc: Ticker Symbol = AMZN , Starting year = 2017 , Ending year = 2022.The correlation between company names and tickers is not always consistent (name: Alphabet Inc., ticker: GOOGL).</span></p>
+            <p><span style={{color:'red'}}>Español</span>:FinConvert devolverá los estados de ingresos, balances y flujos de efectivo, también en formato Excel, desde 2013 hasta la actualidad, donde el "Ticker Symbol" o nombre de la empresa representa una empresa con sede en Estados Unidos y cotizada públicamente(cada empresa tiene una asignada por la SEC).Buscando por nombre de empresa es posible<span style={{color:'red'}}>Por ejemplo en el caso de Netflix : Ticker Symbol = NFLX , Starting year = 2013 , Ending year = 2019.No siempre hay correlación entre los nombres de las empresas y los tickers (nombre: Alphabet Inc., ticker: GOOGL).</span></p>
         </div>
       </div>
       )
@@ -29,17 +32,17 @@ function Intro(props){
 
 }
 
-function RepoLogo(props){
+function RepoLogo(){
 
-  if (!(props.initial === 'initialStyle')){
   return (
-  <a href='https://github.com/CortezFabrizio/FinSearch'>
-    <div style={{marginRight:'100px'}}>
-        <img alth='git logo' src={git_logo} className='github'></img>
-    </div>
+  <a href='https://github.com/CortezFabrizio/FinConvert' style={{display:'block',width:'120px',margin:'auto'}} >
+        <figure style={{marginTop:'20px'}} >
+          <img alth='git logo' src={git_logo} className='github'></img>
+          <figcaption style={{fontSize:'70%'}}>Architecture diagram and Github repository</figcaption>
+        </figure>
   </a>
   )
-  }
+  
 }
 
 
@@ -63,20 +66,21 @@ function App() {
         </a>
         
         <a className={initial_style[3]}><h2 className={`${initial_style[2]} mb-0`}>FinConvert</h2>
-          <p className='smallSZ'>By: Fabrizio Cortez <br></br>fabriziocortezandres@gmail.com</p>
-        </a>
+          <p style={{fontSize:'60%'}}>By: Fabrizio Cortez <br></br>fabriziocortezandres@gmail.com</p>
 
-        <RepoLogo initial={initial_style[0]}></RepoLogo>
+          {initial_style[0] === 'initialStyle' &&
+             <p style={{fontSize:'60%',margin:'0px',color:'red'}}>Read footer for more information / Leer footer </p>
+          }
+
+          
+        </a>
 
       </nav>
 
-      <form className='form-inline justify-content-center'>
+    <form className='form-inline justify-content-center'>  
 
-        <div className='form-floating m-3'>
-          <input id='ticker' type="text" className='form-control' placeholder='.'></input>
-          <label for='ticker'>Ticker Symbol</label>
+          <SearchAutocomplete></SearchAutocomplete>
 
-        </div>
 
         <div className='form-floating m-3'>
           <input id='start_date' type="text" className='form-control' placeholder='.'></input>
@@ -91,18 +95,21 @@ function App() {
 
         </div>
 
+  
         <input type="button" className='btn btn-outline-secondary btn-lg' value="Search" onClick={
         async () => {
-          setFin_data(false)
 
-          const ticker_value = document.getElementById("ticker").value;
-          setTicker(ticker_value)
+          setFin_data(false)
+          const ticker_valu = document.getElementById("ticker").value;
+
+          setTicker(ticker_valu)
+
           const start_date = document.getElementById("start_date").value;
           setStart(start_date)
           const end_date = document.getElementById("end_date").value;
           setEnd(end_date)
 
-          const finanicals = await get_financials(ticker_value,start_date,end_date);
+          const finanicals = await get_financials(ticker_valu,start_date,end_date);
 
           if (!(finanicals[0])){
             setError(finanicals[1])
@@ -116,19 +123,20 @@ function App() {
         }
 
         } > 
-        </input>
+        </input>  
          
-      </form>
+        </form>  
 
   </div>
       <LoadingEffect isLoading={fin_data}></LoadingEffect>
-      <Intro initial={initial_style[0]}></Intro>
+      <RepoLogo></RepoLogo>
+      <Intro initial={initial_style[0]} err={validation_error}></Intro>
 
       {fin_data &&
       
         <div id='results' className='m-3'>
 
-            <button type="button" className="btn btn-success m-4"> <a className="link-light" href={'http://35.87.193.122/create-excel?ticker='+ticker_value+'&start_date='+start_date+'&end_date='+end_date }>Download Excel</a> </button>
+            <button type="button" className="btn btn-success m-4"> <a className="link-light" href={'http://54.214.244.209/create-excel?ticker='+ticker_value+'&start_date='+start_date+'&end_date='+end_date }>Download Excel</a> </button>
       
             { fin_data }
         </div>
@@ -136,7 +144,7 @@ function App() {
 
       {validation_error &&
 
-      <div id='errors' className='card' style={{width:'600px',marginLeft:'30%',marginTop:'20px',backgroundColor:'#FF4500',color:'black'}}>    
+      <div id='errors' className='card' style={{width:'60vw',margin:'auto',marginTop:'1px',backgroundColor:'#ff4d4d',color:'black'}}>    
         <div className='card-body'>
           <ul>
             <strong>
@@ -146,8 +154,9 @@ function App() {
         </div>
       </div> 
       }   
-      
+
     </div>
+
   );
 
 }
@@ -155,7 +164,7 @@ function App() {
 
 async function get_financials(ticker_value,start_date,end_date) {
 
-  const url = new URL ('http://35.87.193.122/get-ticker')
+  const url = new URL ('http://54.214.244.209/get-ticker')
   
   const params = {'ticker':ticker_value,'start_date':start_date,'end_date':end_date}
   url.search = new URLSearchParams(params).toString();
@@ -281,5 +290,88 @@ async function get_financials(ticker_value,start_date,end_date) {
 
   };
 
+
+  function SearchAutocomplete() {
+    const [userInput, setUserInput] = useState(null);
+    const [suggestions, setSuggestions] = useState(null);
+    const [selectedTicker,setSelTicker] = useState('');
+
+    useEffect(() => {
+      const fetchSuggestions = async () => {
+        try {
+          const response = await fetch(`http://54.214.244.209/search-name?Typed=${userInput}`,{
+            method: 'GET',
+          });
+
+          const data = await response.json();
+          setSuggestions(JSON.parse(data));
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      if (userInput){
+        fetchSuggestions();
+      }
+
+    }, [userInput]);
+  
+    const handleInputChange = (event) => {
+      setSelTicker(event.target.value);
+      setUserInput(event.target.value);
+    };
+
+    function setValue (ticker){
+      setSelTicker(ticker);
+ 
+      document.getElementById('suggestions').style.display = 'none';
+    }
+
+
+    const handle_results = function handle (item){
+      if ('ticker' in item){
+        return   <a key={item['ticker']} href="#" style={{margin:'auto'}} onClick={() => setValue(item['ticker'])} className="list-group-item list-group-item-action">{item['name']}</a>
+      }
+    }
+
+
+    function blur (){
+      if(!(document.getElementById('suggestions').style.display === 'none')){
+        setTimeout(() => {
+          document.getElementById('suggestions').style.display = 'none';
+        }, 200);
+    }
+  }
+
+
+    return (
+      <div>
+
+        <div className='form-floating m-3'>
+        <DebounceInput
+          id='ticker'
+          type='text'
+          value={selectedTicker}
+          placeholder='.'
+          onBlur={blur}
+          onClick={()=>{document.getElementById('suggestions').style.display='block'}}
+          className='form-control'
+          minLength={1}
+          debounceTimeout={220}
+          onChange={handleInputChange}
+        />
+
+          <label for='ticker'>Company name or ticker</label>
+
+          <ul style={{width:'100%',position:'absolute',zIndex:1000,display:'none'}} className='list-group list-group-flush' id='suggestions'>
+            <a href="#" style={{margin:'auto',fontSize:'70%'}} className="list-group-item list-group-item-action">Type a name or ticker and select a US company:</a>          
+            {suggestions ? suggestions.map((suggestion) => handle_results(suggestion)) : null}
+        </ul>
+
+        </div>
+
+      </div>
+    );
+  }
 
 export default App;
