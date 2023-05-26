@@ -6,22 +6,14 @@ import requests
 import datetime
 import time
 from bs4 import BeautifulSoup
-from openpyxl import Workbook
-
-from tempfile import NamedTemporaryFile
 
 from fastapi import FastAPI,Response,HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import Response as file_response,JSONResponse
 
+from excel_creator import create_excel
+from company_suggestions import company_searcher
 from exception_handler_functions import error_validation_response,verify_statement_existence
-
-app = FastAPI()
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
-    return JSONResponse(error_validation_response(exc),status_code=400,headers={'Access-Control-Allow-Origin':'*'})
 
 current_year = datetime.date.today().year
 
@@ -52,10 +44,36 @@ regex_date = re.compile(r"[A-Za-z]{3}[.\s]*\d{1,2}[,\s]*\d{4}")
 regex_year = re.compile(r"\d\d\d\d")
 regex_day = re.compile(r"\d\d,")
 regex_month = re.compile(r"[A-Za-z][A-Za-z][A-Za-z]", re.IGNORECASE)
+
 regex_cell_number_class = re.compile('nump|num|text',re.I)
 regex_first_income_row_class = re.compile('nump|num',re.I)
+
 number_month_dict = {'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
                         'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'}
+
+
+
+
+app = FastAPI()
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(error_validation_response(exc),status_code=400,headers={'Access-Control-Allow-Origin':'*'})
+
+
+@app.get('/create-excel')
+def excel_creator(ticker:str,start_date:int,end_date:int):
+
+        excel_file = create_excel(ticker,start_date,end_date)
+
+        return file_response(content=excel_file,media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@app.get("/search-name")
+def search_name(Typed:str,response:Response):
+
+    return company_searcher(Typed,response)
+
 
 @app.get("/get-ticker")
 def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
@@ -64,6 +82,10 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
     response.headers['Access-Control-Allow-Origin'] = '*'
     cors_policy_error_400 = {'Access-Control-Allow-Origin':'*'}
+    
+    year_order = {}
+    statements_results = {}
+    new_financial_data = {}
 
 
     if start_date > end_date or start_date < 2013:
@@ -73,12 +95,9 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
     elif end_date > current_year:
         end_date = current_year+1
 
-    statements_results = {}
-
 
     def search_cik(ticker):
         paramm = {"keysTyped":ticker}
-
         req_index = requests.get(url=sec_search_endpoint,headers=header_req_index,params=paramm)
 
         if req_index.status_code == 500:
@@ -91,7 +110,7 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
                     req_index = req_index_error
                     break
             else:
-                raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist or try again with the exact symbol",headers=cors_policy_error_400) 
+                raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist or try again with the exact symbol (Fabrizio,please see the logs in case of any error)",headers=cors_policy_error_400) 
 
 
         try:
@@ -107,8 +126,6 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
         except:
                 raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist or try again with the exact symbol",headers=cors_policy_error_400) 
                     
-
-    year_order = {}
                 
     def check_years(date_start,date_end):
 
@@ -177,6 +194,7 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
 
     def filling_date_regular_expression(date):
+
         date_components = date.split('-')
 
         dict_months = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'}
@@ -193,10 +211,19 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
         req = requests.post(sec_search_endpoint,headers=header_req,data=payload)
 
+        if req.status_code == 500:
+            for i in range(0,45):
+                time.sleep(0.5)
+                req_handle_error =requests.post(sec_search_endpoint,headers=header_req,data=payload)
+                if req_handle_error.status_code == 200:
+                    req = req_handle_error
+                    break
+            else:
+                raise HTTPException(status_code=400,detail="The ticker does not represent a US company, OR its filings for selected years do not exist (please input higher years).",headers=cors_policy_error_400)
+
         list_fillings = req.json()['hits']['hits']
 
         list_adsh = [{'date':filling_date_regular_expression(filling['_source']['period_ending']),'url':f'https://www.sec.gov/Archives/edgar/data/{cik}/'+filling['_source']['adsh'].replace('-','')} for filling in list_fillings if filling['_source']['file_type'] == '10-K' and int(filling['_source']['period_ending'].split('-')[0]) <= end_date and int(filling['_source']['period_ending'].split('-')[0]) >= start_date ]
-
 
         if list_adsh:
             last_fillings_year = int(list_adsh[0]['date']['regrex_expression'].split('.')[2][1:])
@@ -208,10 +235,8 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
             return (list_adsh)
 
         else:
-            raise HTTPException(status_code=400,detail="Ticker doesn't represent a US company",headers=cors_policy_error_400)
+            raise HTTPException(status_code=400,detail="The ticker does not represent a US company, OR its filings for selected years do not exist (please input higher years).",headers=cors_policy_error_400)
 
-
-    new_financial_data = {}
 
     def valid_format_date(input_date):
         date = regex_date.findall(input_date)[0]
@@ -245,7 +270,6 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
         years_row = rows_list[row_years_index].find_all('th',attrs={'class':'th'})
 
-        
         years = [ regex_date.findall(year_row.getText())[0] for year_row in years_row if regex_date.findall(year_row.getText())]
 
         for index,year in enumerate(reversed(years)):
@@ -367,29 +391,68 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
             req = requests.get(filling_summary,headers=header_req)
 
             reports = BeautifulSoup(req.text,features='xml').find_all('Report')[1:10]
+
             income_state = False
             balance_state = False
             flow_state = False
 
             for report in reports:
                 report_name = report.find('ShortName').getText().upper()
+
+                if "PARENTHETICAL" in report_name:
+                    continue
+
                 html_file_name = report.find('HtmlFileName').getText()
                 file_url = filling+f'/{html_file_name}'
-                if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name:
-                    if not income_state:
-                        parse_statement('Income',True,file_url,filling_date,start_date,valid_years_list,True)
-                        income_state = True
 
-                if "BALANCE" in report_name and "SHEET" in report_name:
-                    if not balance_state:
-
+                if not balance_state:
+                    if ("BALANCE" and "SHEET") in report_name: 
                         parse_statement('Balance',False,file_url,filling_date,start_date,valid_years_list)
                         balance_state = True
+                        continue
 
-                if "CASH FLOW" in report_name:
-                    if not flow_state:
+                    elif (("FINANCIAL" and "CONDITION") in report_name or "POSITION" in report_name or ("ASSETS" and "LIABILITIES") in report_name) :
+                        alternative_balance_name = file_url
+                        continue
+
+                    elif "POSITION" in report_name:
+                        conflict_balance_name = file_url
+                        continue
+
+                if not flow_state:
+                    if ("CASH" and "FLOW") in report_name:
                         parse_statement('Cash',True,file_url,filling_date,start_date,valid_years_list)
                         flow_state = True
+                        continue
+
+                    elif ('CASH' and 'POSITION') in report_name:
+                        alternative_flow_name = file_url
+                        continue
+
+                if not income_state:
+                    if "OPERATION" or "INCOME" or "EARNING" or ('PROFIT' in report_name and 'LOSS') in report_name:
+                        parse_statement('Income',True,file_url,filling_date,start_date,valid_years_list,True)
+                        income_state = True
+                        continue
+
+            else:
+                if not balance_state:
+                    if 'alternative_balance_name' in locals():
+                        parse_statement('Balance',False,alternative_balance_name,filling_date,start_date,valid_years_list)
+                        del alternative_balance_name
+
+                        if 'conflict_balance_name' in locals():
+                            del conflict_balance_name
+                    
+                    elif 'conflict_balance_name' in locals():
+                        parse_statement('Balance',False,conflict_balance_name,filling_date,start_date,valid_years_list)
+                        del conflict_balance_name
+
+                if not flow_state:
+                    if 'alternative_flow_name' in locals():
+                        parse_statement('Cash',True,alternative_flow_name,filling_date,start_date,valid_years_list)
+                        del alternative_flow_name
+
 
 
         return new_financial_data
@@ -402,7 +465,6 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
         dates = year_order[year]
         for date in dates:
             statements_results[date] = dates[date]
-
 
     if new_financial_result:
         sqs = boto3.client('sqs')
@@ -427,98 +489,3 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
 
 
-@app.get('/create-excel')
-def excel_creator(ticker:str,start_date:int,end_date:int):
-
-        param = {'ticker':ticker,'start_date':start_date,'end_date':end_date}
-        res = requests.get('http://127.0.0.1:8000/get-ticker',param)
-
-        financials = json.loads(res.json())
-
-        wb = Workbook()
-        sheet = wb.worksheets[0]
-
-        sheet.column_dimensions['E'].width = 25
-        sheet.column_dimensions['P'].width = 25
-        sheet.column_dimensions['Y'].width = 25
-
-        row_index = 1
-
-        for year in financials:
-
-            statements = financials[year]
-
-            sheet.cell(row=row_index,column=1 ,value=year)
-
-            greater_length = 0
-
-            for statement_name in statements:
-                original_row_index = row_index
-
-                if statement_name == 'Income':
-                    column_index = 3
-                elif statement_name == 'Balance':
-                    column_index = 14
-                elif statement_name == 'Cash':
-                    column_index = 23
-
-                statement = statements[statement_name]
-
-                title = statement['title']
-
-                sheet.cell(row=original_row_index+1,column=column_index,value=title)
-
-                del statement['title']
-
-                for concept_title in statement:
-
-                    sheet.cell(row=original_row_index+3,column=column_index+1,value=concept_title)
-
-                    concepts = statement[concept_title]
-
-                    for concept in concepts:
-                        value = concepts[concept]
-
-                        sheet.cell(row=original_row_index+4,column=column_index+2,value=concept)
-                        sheet.cell(row=original_row_index+4,column=column_index+3,value=value)
-                        original_row_index+=1
-
-                    original_row_index+=2
-
-                difference_by_length = original_row_index-row_index
-                if difference_by_length > greater_length:
-                    greater_length = difference_by_length
-
-            else:
-                row_index+= greater_length+4
-
-
-        with NamedTemporaryFile() as tmp:
-                file_path = tmp.name
-                wb.save(file_path)
-                stream = tmp.read()
-        
-        return file_response(content=stream,media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-   
-
-@app.get("/search-name")
-def search_name(Typed:str,response:Response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-
-    keys_typed = Typed.strip(' ').upper()
-
-    req_search = requests.get(f'https://efts.sec.gov/LATEST/search-index?keysTyped={keys_typed}',headers=header_req_index)
-
-    if req_search.status_code == 200 :
-        results = req_search.json()['hits']['hits']
-        print(results)
-        list_results = [{'ticker':result['_source']['tickers'].split(',')[0],'name':result['_source']['entity']} for result in results if 'tickers' in result['_source']]
-
-        if list_results:
-            return json.dumps(list_results)
-        else:
-            return json.dumps([{'error':'No tickers found'}])
-    
-    else:
-
-        return json.dumps([{'error':'SEC endpoint could not process the request'}])
