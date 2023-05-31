@@ -75,6 +75,17 @@ def search_name(Typed:str,response:Response):
     return company_searcher(Typed,response)
 
 
+@app.get('/create-income-plot') 
+def plot_data(ticker:str,start_date:int,end_date:int,income_item:str):
+
+    image_content = plot_concept(ticker,start_date,end_date,income_item)
+
+    if type(image_content) == Exception:
+        return 'Wrong values'
+
+    return FileResponse(image_content,media_type='image/png')
+
+
 @app.get("/get-ticker")
 def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
