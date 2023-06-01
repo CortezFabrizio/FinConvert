@@ -356,10 +356,7 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
    
                         cell_class = cell.get('class')[0]
 
-                        non_digit_filter = re.sub('\D','',cell.getText())
-
-                        if cell_class == 'num':
-                            non_digit_filter = f'({non_digit_filter})'
+                        non_digit_filter = re.sub("[^0-9.,$()]", "", cell.getText())
 
                         try:
 
