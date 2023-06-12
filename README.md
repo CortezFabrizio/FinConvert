@@ -6,5 +6,5 @@ The data is extracted directly from the Securities and Exchange Commission (SEC)
 
 Thank you for your attention!
 
-TechStack:FastAPI,React,DynamoDB,S3,SQS,ECS,ECR,Docker,Nginx,Bootstrap.
+TechStack:FastAPI,React,DynamoDB,S3,Terraform,SQS,ECS,ECR,Docker,Nginx,Bootstrap.
 

@@ -1,0 +1,35 @@
+[
+    {
+      "name": "fastapi_def",
+      "image": "870828436064.dkr.ecr.us-west-2.amazonaws.com/fast_api_x64:latest",
+      "cpu": 750,
+      "memory": 700,
+      "runtimePlatform": {
+          "cpuArchitecture": "X86_64",
+          "operatingSystemFamily": "LINUX"
+      },
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp",
+          "appProtocol": "http"
+        }
+      ],
+      "environment": [
+                  {
+                      "name": "AWS_DEFAULT_REGION",
+                      "value": "us-west-2"
+                  },
+                  {
+                      "name": "USER_AGENT",
+                      "value": "fabriziocortezandres@gmail.com"
+                  },
+                  {
+                      "name": "AWS_REGION",
+                      "value": "us-west-2"
+                  }
+              ]
+    }
+  ]
