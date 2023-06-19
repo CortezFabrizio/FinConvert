@@ -9,10 +9,11 @@ from bs4 import BeautifulSoup
 
 from fastapi import FastAPI,Response,HTTPException
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import Response as file_response,JSONResponse
+from fastapi.responses import Response as ResponseFromMemory,JSONResponse,FileResponse
 
 from excel_creator import create_excel
 from company_suggestions import company_searcher
+from plot_values import plot_concept
 from exception_handler_functions import error_validation_response,verify_statement_existence
 
 current_year = datetime.date.today().year
@@ -53,7 +54,6 @@ number_month_dict = {'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': 
 
 
 
-
 app = FastAPI()
 
 @app.exception_handler(RequestValidationError)
@@ -66,13 +66,14 @@ def excel_creator(ticker:str,start_date:int,end_date:int):
 
         excel_file = create_excel(ticker,start_date,end_date)
 
-        return file_response(content=excel_file,media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        return ResponseFromMemory(content=excel_file,media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 @app.get("/search-name")
 def search_name(Typed:str,response:Response):
 
     return company_searcher(Typed,response)
+
 
 
 @app.get('/create-income-plot') 
@@ -93,10 +94,6 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
     response.headers['Access-Control-Allow-Origin'] = '*'
     cors_policy_error_400 = {'Access-Control-Allow-Origin':'*'}
-    
-    year_order = {}
-    statements_results = {}
-    new_financial_data = {}
 
 
     if start_date > end_date or start_date < 2013:
@@ -105,6 +102,8 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
     
     elif end_date > current_year:
         end_date = current_year+1
+
+    statements_results = {}
 
 
     def search_cik(ticker):
@@ -137,6 +136,7 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
         except:
                 raise HTTPException(status_code=400,detail="Provisioned ticker doesn't exist or try again with the exact symbol",headers=cors_policy_error_400) 
                     
+    year_order = {}
                 
     def check_years(date_start,date_end):
 
@@ -249,6 +249,8 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
             raise HTTPException(status_code=400,detail="The ticker does not represent a US company, OR its filings for selected years do not exist (please input higher years).",headers=cors_policy_error_400)
 
 
+    new_financial_data = {}
+
     def valid_format_date(input_date):
         date = regex_date.findall(input_date)[0]
         year = regex_year.findall(date)[0]
@@ -300,7 +302,6 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
                     date_formated = valid_format_date(current_date)
                     valid_date = date_formated[0]
                     current_year = date_formated[1]
-
 
                     if current_year not in valid_years_list or int(current_year) < end_date :
                         invalid_years_index.insert(0,index_year)
@@ -354,7 +355,7 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
                         valid_year = valid_index[1]
    
-                        cell_class = cell.get('class')[0]
+                        #cell_class = cell.get('class')[0]
 
                         non_digit_filter = re.sub("[^0-9.,$()]", "", cell.getText())
 
@@ -414,12 +415,12 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
                 file_url = filling+f'/{html_file_name}'
 
                 if not balance_state:
-                    if ("BALANCE" and "SHEET") in report_name: 
+                    if "BALANCE" in report_name and "SHEET" in report_name:  #add "financial condition case"
                         parse_statement('Balance',False,file_url,filling_date,start_date,valid_years_list)
                         balance_state = True
                         continue
 
-                    elif (("FINANCIAL" and "CONDITION") in report_name or "POSITION" in report_name or ("ASSETS" and "LIABILITIES") in report_name) :
+                    elif (("FINANCIAL" in report_name and ("CONDITION" in report_name or "POSITION" in report_name)) or ("ASSETS" in report_name and "LIABILITIES" in report_name) ) :
                         alternative_balance_name = file_url
                         continue
 
@@ -428,17 +429,17 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
                         continue
 
                 if not flow_state:
-                    if ("CASH" and "FLOW") in report_name:
+                    if "CASH" in report_name and "FLOW" in report_name:
                         parse_statement('Cash',True,file_url,filling_date,start_date,valid_years_list)
                         flow_state = True
                         continue
 
-                    elif ('CASH' and 'POSITION') in report_name:
+                    elif 'CASH' in report_name and 'POSITION' in report_name:
                         alternative_flow_name = file_url
                         continue
 
                 if not income_state:
-                    if "OPERATION" or "INCOME" or "EARNING" or ('PROFIT' in report_name and 'LOSS') in report_name:
+                    if "OPERATION" in report_name or "INCOME" in report_name or "EARNING" in report_name or ('PROFIT' in report_name and 'LOSS' in report_name):
                         parse_statement('Income',True,file_url,filling_date,start_date,valid_years_list,True)
                         income_state = True
                         continue
@@ -468,7 +469,6 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
 
     new_financial_result = get_statements(ticker,start_date,end_date,check_years(start_date,end_date))
     
-
     for year in year_order:
         dates = year_order[year]
         for date in dates:
@@ -492,8 +492,11 @@ def get_ticker(ticker:str,start_date:int,end_date:int,response:Response):
             MessageAttributes=sqs_attribute
         )
 
-  
+
+
+    if not statements_results:
+        raise HTTPException(status_code=400,detail="The company has not submitted any financial data for those years",headers=cors_policy_error_400) 
+
+        
     return json.dumps(statements_results)
-
-
 

@@ -21,7 +21,7 @@ matplotlib.use('agg')
 
 ##################################
 
-save_plot_image_in = os.getenv('PLOTS_PATH')
+saved_images_path = os.getenv('PLOTS_PATH')
 
 def plot_concept (ticker,start_date,end_date,income_concept):
 
@@ -63,7 +63,7 @@ def plot_concept (ticker,start_date,end_date,income_concept):
     plt.ylabel('Net sales')
     plt.title('Net Sales over time')
 
-    path_to_image = save_plot_image_in+f'{ticker}.png'
+    path_to_image = saved_images_path+f'{ticker}.png'
 
     plt.savefig(path_to_image,format='png')
 
